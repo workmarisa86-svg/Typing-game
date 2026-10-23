@@ -1,7 +1,7 @@
 /* Screens, menus, map, shop, stats, parent view, certificates, key guide and input wiring */
 'use strict';
 
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '3.0.0';
 
 const UI = (() => {
   const $ = id => document.getElementById(id);
@@ -20,6 +20,7 @@ const UI = (() => {
     if (prev && prev.id !== id) { const n = $(id); n.classList.remove('enter'); void n.offsetWidth; n.classList.add('enter'); }
     currentScreen = id;
     if (id !== 'scr-game') Game.stop();
+    if (id !== 'scr-piano' && typeof Piano !== 'undefined') Piano.stop();
     if (id === 'scr-start') startBg();
     document.documentElement.lang = lang();
   }
@@ -58,8 +59,11 @@ const UI = (() => {
   function totalStars(p) { return Object.values(p.progress).reduce((a, r) => a + (r.stars || 0), 0); }
   function wonCount(p) { return Object.values(p.progress).filter(r => r.won).length; }
   function applyAudio() {
+    const vol = profile && profile.settings.volume != null ? profile.settings.volume / 100 : 0.8;
     Sound.setSound(profile ? profile.settings.sound : true);
     Sound.setMusic(profile ? profile.settings.music : false);
+    Sound.setVolume(vol);
+    if (typeof PianoAudio !== 'undefined') PianoAudio.setVolume(vol);
   }
   function applyStatic() {
     document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
@@ -145,6 +149,19 @@ const UI = (() => {
         h('button', { class: 'btn btn-ghost', onclick: closeModal }, t('keep')),
         h('button', { class: 'btn btn-danger', onclick: () => { Store.remove(p.id); closeModal(); renderStart(); } }, t('delete'))));
   }
+  function pianoFromStart() {
+    Sound.unlock();
+    if (!Store.profiles.length) { toast(t('createFirst'), 2400); newProfile(); return; }
+    if (Store.profiles.length === 1) { profile = Store.profiles[0]; Store.select(profile.id); applyAudio(); Piano.openMenu(); return; }
+    openModal(h('h2', {}, '🎹 ' + t('whoPlaying')),
+      h('div', { class: 'profile-list' }, Store.profiles.map(p => {
+        const cv = h('canvas', { width: 108, height: 108 });
+        const card = h('div', { class: 'profile-card', role: 'button', tabindex: '0', onclick: () => { closeModal(); profile = p; Store.select(p.id); applyAudio(); applyStatic(); Piano.openMenu(); } },
+          cv, h('div', { class: 'pc-info' }, h('b', {}, p.name)));
+        headshot(cv, p.look);
+        return card;
+      })));
+  }
   function choose(p) {
     Sound.unlock(); Sound.play('click');
     Store.select(p.id); profile = p; applyAudio(); applyStatic();
@@ -182,6 +199,14 @@ const UI = (() => {
       h('div', { class: 'set-row' }, h('div', { class: 'sr-label' }, t('device'), h('small', {}, t('deviceNote')), devNote),
         seg('device', [['auto', t('auto')], ['laptop', t('laptop')], ['phone', t('phone')]], updateDeviceNote)),
       row(t('fingerGuide'), t('fingerGuideNote'), onOff('fingerGuide')),
+      row(t('volume'), t('volumeNote'), (() => {
+        const v = st.volume == null ? 80 : st.volume;
+        const out = h('span', { class: 'vol-val' }, v + '%');
+        const inp = h('input', { type: 'range', min: '0', max: '100', step: '5', value: String(v), class: 'vol', 'aria-label': t('volume') });
+        inp.addEventListener('input', () => { st.volume = +inp.value; out.textContent = inp.value + '%'; applyAudio(); });
+        inp.addEventListener('change', () => { Store.save(); Sound.play('click'); PianoAudio.play(72, 0.5, 0.8); });
+        return h('div', { class: 'vol-wrap' }, inp, out);
+      })()),
       row(t('sound'), '', onOff('sound')),
       row(t('music'), '', onOff('music')),
       row(t('blood'), t('bloodNote'), onOff('blood')),
@@ -914,7 +939,9 @@ const UI = (() => {
     const avgAcc = hist.length ? hist.reduce((a, x) => a + x.acc, 0) / hist.length : 0;
     const avgWpm = hist.length ? hist.reduce((a, x) => a + x.wpm, 0) / hist.length : 0;
     const last = p.history.length ? p.history[p.history.length - 1].t : 0;
-    return { plays: hist.length, done: list.filter(l => won(p, l)).length, total: list.length, stars: totalStars(p), best: Math.round(p.stats.bestWpm || 0),
+    const pd = p.piano || { songs: {} };
+    const piano = Object.values(pd.songs).filter(r => r.done).length + ' / ' + ((window.PIANO_SONGS || []).length || 45);
+    return { piano, plays: hist.length, done: list.filter(l => won(p, l)).length, total: list.length, stars: totalStars(p), best: Math.round(p.stats.bestWpm || 0),
       avgAcc: Math.round(avgAcc), avgWpm: Math.round(avgWpm), keys: p.stats.keys, last, weak: weakKeys(p).slice(0, 5).map(w => w.k),
       certs: Object.keys(p.certs).length, worlds: WORLDS.filter(w => list.some(l => l.world === WORLDS.indexOf(w))).length };
   }
@@ -925,7 +952,8 @@ const UI = (() => {
     const tile = (v, label) => h('div', { class: 'stat-tile' }, h('b', {}, v), h('small', {}, label));
     body.append(h('div', { class: 'stat-tiles' },
       tile(sm.best, t('bestSpeed')), tile(sm.plays ? sm.avgAcc + '%' : '—', t('recentAcc')), tile(sm.done + ' / ' + sm.total, t('levelsCompleted')),
-      tile('★ ' + sm.stars, t('starsCap')), tile(sm.keys, t('keysTyped')), tile(sm.certs, t('certificates'))));
+      tile('★ ' + sm.stars, t('starsCap')), tile(sm.keys, t('keysTyped')), tile(sm.certs, t('certificates')),
+      tile('🎹 ' + sm.piano, t('pianoSongs'))));
     const hist = p.history.slice(-30);
     body.append(h('div', { class: 'charts' },
       lineChart(hist, 'acc', t('accOverTime'), '%', '#8bdc6a', 100),
@@ -967,6 +995,7 @@ const UI = (() => {
       ['keysTyped', s => s.keys],
       ['mostMissed', s => s.weak.length ? s.weak.map(keyLabel).join(' ') : '—'],
       ['certificates', s => s.certs],
+      ['pianoSongs', s => '🎹 ' + s.piano],
       ['lastPlayed', s => s.last ? fmtDate(s.last) : '—']
     ];
     const tbl = h('table', { class: 'parent-table' },
@@ -1017,6 +1046,7 @@ const UI = (() => {
     document.documentElement.style.setProperty('--app-h', hgt + 'px');
     window.scrollTo(0, 0);
     if (currentScreen === 'scr-game') Game.resize();
+    if (currentScreen === 'scr-piano') Piano.resize();
   }
 
   // ---------- installable app ----------
@@ -1055,6 +1085,10 @@ const UI = (() => {
     $('btn-map-shop').addEventListener('click', openShop);
     $('btn-map-stats').addEventListener('click', openStats);
     $('btn-map-smart').addEventListener('click', smartPractice);
+    $('btn-map-piano').addEventListener('click', () => Piano.openMenu());
+    $('btn-piano').addEventListener('click', pianoFromStart);
+    Piano.init({ h, openModal, closeModal, toast, show, applyStatic, isPhone, lang: () => lang(), profile: () => profile,
+      screen: () => currentScreen, back: () => { if (profile && currentScreen !== 'scr-start') openMap(); else { show('scr-start'); renderStart(); } } });
     document.querySelectorAll('.btn-back-map').forEach(b => b.addEventListener('click', () => openMap()));
     $('btn-parent-back').addEventListener('click', () => { if (profile) openMap(); else { show('scr-start'); renderStart(); } });
     $('btn-guide-back').addEventListener('click', () => { if (guideBack === 'scr-map' && profile) openMap(); else { show('scr-start'); renderStart(); } });

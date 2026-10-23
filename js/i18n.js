@@ -3,6 +3,15 @@
 
 const STRINGS = {
   en: {
+    pianoBtn: '🎹 Piano Challenge', pianoTitle: 'Piano Challenge', pianoShort: 'Piano', createFirst: 'Create a player first — then the piano is ready!',
+    pianoIntro: 'Press the letter on each falling tile when it reaches the gold line. Every correct key plays the next notes of the piece. Finish a song to unlock the next one.',
+    pd_beginner: 'Beginner', pd_easy: 'Easy', pd_medium: 'Medium', pd_hard: 'Hard', pd_expert: 'Expert',
+    bestScore: 'Best', pianoLocked: 'Finish the song before this one to unlock it.',
+    pianoHow: 'Higher notes are on the right, lower notes on the left. One key plays a whole chord.',
+    pianoChallengeRule: 'Challenge: 3 mistakes or missed tiles end the song.', pianoPracticeRule: 'Practice: tiles wait for the right key. No game over.',
+    pianoPressToStart: 'Press {0} to start the music', loadingPiano: 'Loading piano…', combo: 'COMBO', score: 'Score', bestCombo: 'Best combo',
+    notesPlayed: 'tiles played', songComplete: 'Song complete!', songOver: 'Song over!', songUnlocked: 'New song: {0}', songs: 'Songs',
+    pianoSongs: 'Piano songs', volume: 'Volume', volumeNote: 'Piano, sounds and music',
     // start
     tagline: 'Type fast. Type true. Get away!', whoPlaying: 'Who is playing?', newPlayer: '+ New player', keyGuide: '⌨ Key Guide',
     parentView: '👪 Parent view', installApp: '⬇ Install app', noPlayers: 'No players yet. Create your runner to begin!',
@@ -31,7 +40,7 @@ const STRINGS = {
     typeChase: 'Chase', typeFalling: 'Falling', typeHold: 'Hold-on',
     tipChase: 'Something is running after you. Type fast to pull away!',
     tipFalling: 'Things are dropping! Type the number of keys shown in the ring before they land.',
-    tipBoulder: 'Hold the boulder up! Each correct key gives you strength.', tipVine: 'Climb the vine! Type to climb; your grip slowly weakens.',
+    tipBoulder: 'The posts broke — hold up the roof! Each correct key gives you strength. If you let go, it falls.', tipVine: 'Climb the vine! Type to climb; your grip slowly weakens.',
     practiceTip: 'Practice mode: no danger, just type!', minSpeed: 'Min speed {0} WPM', best: 'Best', wpm: 'WPM',
     goalSpeed: 'Goal: 90% accuracy and {0} WPM', goalSurvive: 'Goal: reach the finish line alive', start: 'Start',
     capsTip: 'Capitals: hold Shift with the OTHER hand. Left-hand letters use Right Shift; right-hand letters use Left Shift.',
@@ -57,7 +66,7 @@ const STRINGS = {
     noThanks: 'No thanks', revive: 'Revive ({0})', usedRevive: 'You used your revive.',
     keyHelp: 'Key help', backToEscape: 'Back to the escape', paused: 'Paused', quitToMap: 'Quit to map', restart: 'Restart', resume: 'Resume',
     // results
-    escaped: 'You escaped!', wellDone: 'Well done!', lostGrip: 'You lost your grip!', tooHeavy: 'The boulder was too heavy!',
+    escaped: 'You escaped!', wellDone: 'Well done!', lostGrip: 'You lost your grip!', tooHeavy: 'The roof came down!',
     caught: 'You got caught!', notFast: 'Not fast enough yet!', goal: 'Goal', acc90: '90% accuracy', and: 'and',
     wpmSpeed: 'WPM speed', accuracy: 'Accuracy', bestStreak: 'Best streak', coinsCap: 'Coins', unlockedLevel: 'Level {0} unlocked!',
     didYouKnow: 'Did you know?', map: 'Map', retry: 'Retry', next: 'Next', continue: 'Continue',
@@ -101,6 +110,15 @@ const STRINGS = {
     opt_ponytail: 'Ponytail', opt_long: 'Long hair', opt_bun: 'Bun', opt_braid: 'Braid'
   },
   es: {
+    pianoBtn: '🎹 Desafío de piano', pianoTitle: 'Desafío de piano', pianoShort: 'Piano', createFirst: 'Primero crea un jugador: ¡luego el piano estará listo!',
+    pianoIntro: 'Pulsa la letra de cada ficha cuando llegue a la línea dorada. Cada tecla correcta toca las siguientes notas de la obra. Termina una canción para desbloquear la siguiente.',
+    pd_beginner: 'Principiante', pd_easy: 'Fácil', pd_medium: 'Intermedio', pd_hard: 'Difícil', pd_expert: 'Experto',
+    bestScore: 'Mejor', pianoLocked: 'Termina la canción anterior para desbloquear esta.',
+    pianoHow: 'Las notas más agudas van a la derecha y las graves a la izquierda. Una tecla toca un acorde entero.',
+    pianoChallengeRule: 'Desafío: 3 errores o fichas perdidas terminan la canción.', pianoPracticeRule: 'Práctica: las fichas esperan la tecla correcta. No se pierde.',
+    pianoPressToStart: 'Pulsa {0} para empezar la música', loadingPiano: 'Cargando piano…', combo: 'COMBO', score: 'Puntos', bestCombo: 'Mejor combo',
+    notesPlayed: 'fichas tocadas', songComplete: '¡Canción completada!', songOver: '¡Fin de la canción!', songUnlocked: 'Nueva canción: {0}', songs: 'Canciones',
+    pianoSongs: 'Canciones de piano', volume: 'Volumen', volumeNote: 'Piano, sonidos y música',
     tagline: '¡Escribe rápido. Escribe bien. Escapa!', whoPlaying: '¿Quién juega?', newPlayer: '+ Nuevo jugador', keyGuide: '⌨ Guía de teclas',
     parentView: '👪 Vista de padres', installApp: '⬇ Instalar app', noPlayers: 'Aún no hay jugadores. ¡Crea tu corredor para empezar!',
     levelsDone: 'Niveles', coins: 'monedas', deletePlayer: 'Borrar jugador', deleteQ: '¿Borrar a {0}?',
@@ -125,7 +143,7 @@ const STRINGS = {
     typeChase: 'Persecución', typeFalling: 'Caída', typeHold: 'Aguanta',
     tipChase: 'Algo corre detrás de ti. ¡Escribe rápido para alejarte!',
     tipFalling: '¡Caen cosas! Escribe las teclas que marca el anillo antes de que caigan.',
-    tipBoulder: '¡Sostén la roca! Cada tecla correcta te da fuerza.', tipVine: '¡Sube por la liana! Escribe para subir; tu agarre se debilita.',
+    tipBoulder: 'Se rompieron los postes: ¡sostén el techo! Cada tecla correcta te da fuerza. Si lo sueltas, se cae.', tipVine: '¡Sube por la liana! Escribe para subir; tu agarre se debilita.',
     practiceTip: 'Modo práctica: sin peligro, ¡solo escribe!', minSpeed: 'Mín. {0} PPM', best: 'Mejor', wpm: 'PPM',
     goalSpeed: 'Meta: 90 % de precisión y {0} PPM', goalSurvive: 'Meta: llegar vivo a la meta', start: 'Empezar',
     capsTip: 'Mayúsculas: pulsa Shift con la OTRA mano. Las letras de la mano izquierda usan Shift derecho; las de la derecha, Shift izquierdo.',
@@ -149,7 +167,7 @@ const STRINGS = {
     outOfStrength: '¡Sin fuerza!', reviveQ: '¿Levantarte una vez por {0} monedas?', youHave: 'Tienes {0} monedas.',
     noThanks: 'No, gracias', revive: 'Revivir ({0})', usedRevive: 'Usaste tu revivir.',
     keyHelp: 'Ayuda de tecla', backToEscape: 'Volver al escape', paused: 'Pausa', quitToMap: 'Salir al mapa', restart: 'Reiniciar', resume: 'Seguir',
-    escaped: '¡Escapaste!', wellDone: '¡Bien hecho!', lostGrip: '¡Te soltaste!', tooHeavy: '¡La roca pesaba demasiado!',
+    escaped: '¡Escapaste!', wellDone: '¡Bien hecho!', lostGrip: '¡Te soltaste!', tooHeavy: '¡Se cayó el techo!',
     caught: '¡Te atraparon!', notFast: '¡Aún no es suficientemente rápido!', goal: 'Meta', acc90: '90 % de precisión', and: 'y',
     wpmSpeed: 'Velocidad PPM', accuracy: 'Precisión', bestStreak: 'Mejor racha', coinsCap: 'Monedas', unlockedLevel: '¡Nivel {0} desbloqueado!',
     didYouKnow: '¿Sabías que…?', map: 'Mapa', retry: 'Repetir', next: 'Siguiente', continue: 'Continuar',

@@ -19,7 +19,7 @@ const Store = (() => {
   function fillDefaults(p) {
     p.settings = Object.assign({
       mode: 'challenge', winStyle: 'survival', device: 'auto',
-      fingerGuide: true, sound: true, music: true, blood: false,
+      fingerGuide: true, sound: true, music: true, blood: false, volume: 80,
       uiLang: data.uiLang || defLang, typeLang: data.uiLang || defLang, verse: false
     }, p.settings || {});
     p.progress = p.progress || {};
@@ -64,7 +64,7 @@ const Store = (() => {
 })();
 
 const Sound = (() => {
-  let ac = null, musicTimer = null, musicOn = false, soundOn = true, step = 0;
+  let ac = null, musicTimer = null, musicOn = false, soundOn = true, step = 0, volume = 0.8;
   function ctx() {
     if (!ac) {
       const AC = window.AudioContext || window.webkitAudioContext;
@@ -79,7 +79,7 @@ const Sound = (() => {
     const t = a.currentTime + when;
     const o = a.createOscillator(), g = a.createGain();
     o.type = type; o.frequency.setValueAtTime(freq, t);
-    g.gain.setValueAtTime(vol, t);
+    g.gain.setValueAtTime(Math.max(0.0002, vol * volume / 0.8), t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(g).connect(a.destination);
     o.start(t); o.stop(t + dur + 0.02);
@@ -116,6 +116,7 @@ const Sound = (() => {
   return {
     play(name) { if (soundOn && fx[name]) try { fx[name](); } catch (e) {} },
     setSound(v) { soundOn = v; },
+    setVolume(v) { volume = Math.max(0.001, v); },
     setMusic(v) {
       musicOn = v;
       if (v && !musicTimer) musicTimer = setInterval(() => { if (musicOn && ac) tick(); }, 190);

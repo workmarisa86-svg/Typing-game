@@ -35,6 +35,7 @@
         <button id="btn-new" class="btn btn-gold" data-i18n="newPlayer">+ New player</button>
       </div>
       <div class="start-btns">
+        <button id="btn-piano" class="btn btn-piano" data-i18n="pianoBtn">🎹 Piano Challenge</button>
         <button id="btn-guide-start" class="btn" data-i18n="keyGuide">⌨ Key Guide</button>
         <button id="btn-parent" class="btn" data-i18n="parentView">👪 Parent view</button>
         <button id="btn-install" class="btn btn-green hidden" data-i18n="installApp">⬇ Install app</button>
@@ -79,6 +80,7 @@
       <div class="tb-stat"><span class="coin"></span><b id="map-coins">0</b></div>
       <div class="tb-stat hide-xs"><span class="star-ico">★</span><b id="map-stars">0</b></div>
       <div class="tb-spacer"></div>
+      <button id="btn-map-piano" class="btn btn-small" data-i18n-title="pianoTitle">🎹<span class="hide-sm" data-i18n="pianoShort"> Piano</span></button>
       <button id="btn-map-smart" class="btn btn-small" data-i18n-title="smartPractice">🎯<span class="hide-sm" data-i18n="smartBtn"> Practice</span></button>
       <button id="btn-map-shop" class="btn btn-small" data-i18n-title="shopTitle">👕<span class="hide-sm" data-i18n="shopBtn"> Shop</span></button>
       <button id="btn-map-stats" class="btn btn-small" data-i18n-title="statsTitle">📊<span class="hide-sm" data-i18n="statsBtn"> Stats</span></button>
@@ -180,6 +182,33 @@
     <div class="page-scroll"><div id="parent-body" class="page-body"></div></div>
   </section>
 
+  <!-- PIANO CHALLENGE: song selection -->
+  <section id="scr-piano-menu" class="screen piano-theme">
+    <header class="topbar">
+      <button id="btn-pm-back" class="btn btn-small" data-i18n="back">Back</button>
+      <h2 class="tb-title" data-i18n="pianoTitle">Piano Challenge</h2>
+      <div class="tb-spacer"></div>
+      <div class="tb-stat"><span class="coin"></span><b id="pm-coins">0</b></div>
+    </header>
+    <div class="page-scroll"><div id="pm-body" class="page-body"></div></div>
+  </section>
+
+  <!-- PIANO CHALLENGE: playing -->
+  <section id="scr-piano" class="screen piano-theme">
+    <div class="pp-hud">
+      <div class="pp-info"><b id="pp-title"></b><small id="pp-composer"></small></div>
+      <div class="pp-stats"><span id="pp-lives" class="pp-lives"></span><b id="pp-score">0</b><span id="pp-combo" class="pp-combo"></span></div>
+      <button id="btn-pp-pause" class="round-btn" data-i18n-title="paused">❚❚</button>
+    </div>
+    <div class="pp-progress"><div id="pp-progress"></div></div>
+    <div id="pp-stage" class="pp-stage">
+      <canvas id="piano-canvas"></canvas>
+      <div id="pp-loading" class="pp-loading hidden" data-i18n="loadingPiano">Loading piano…</div>
+    </div>
+    <div id="pp-keys" class="pp-keys"></div>
+    <input id="piano-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" aria-label="Piano input">
+  </section>
+
   <!-- MODAL + TOAST -->
   <div id="modal" class="modal hidden"><div id="modal-box" class="modal-box panel"></div></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -192,6 +221,8 @@
 <script src="js/store.js"></script>
 <script src="js/art.js"></script>
 <script src="js/game.js"></script>
+<script src="js/songs.js"></script>
+<script src="js/piano.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>

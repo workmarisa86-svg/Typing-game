@@ -420,7 +420,7 @@ const Game = (() => {
       const boost = sprinting() ? 1.35 : 1;
       if (!S.practice) {
         const type = S.level.type;
-        if (type === 'chase') S.gap = Math.min(100, S.gap + rate() / S.targetCps * 1.08 * boost);
+        if (type === 'chase') S.gap = Math.min(100, S.gap + rate() / (S.targetCps * (1 + 0.3 * S.pos / S.text.length)) * 1.04 * boost);
         if (type === 'boulder' || type === 'vine') S.strength = Math.min(100, S.strength + DRAIN / S.targetCps * 1.1 * boost);
         else S.strength = Math.min(100, S.strength + 0.35);
         if (type === 'falling') S.objs.forEach(o => { if (!o.dodged && !o.landed) { o.got++; if (o.got >= o.need) { o.dodged = true; o.wx = S.cam + playerScreen().x + o.off; S.dashT = S.t; Sound.play('whoosh'); } } });
@@ -435,7 +435,7 @@ const Game = (() => {
       if (type === 'chase' || type === 'falling') S.tripT = S.t;
       else S.slipT = S.t;
       if (!S.practice) {
-        if (type === 'chase') { S.gap -= 8; hurt(4); }
+        if (type === 'chase') { S.gap -= 13; S.lungeT = S.t; hurt(4); }
         else if (type === 'falling') { spawn(1.5); hurt(4); }
         else hurt(8);
       }
@@ -443,7 +443,10 @@ const Game = (() => {
     }
     S.hooks.onChange(S);
   }
-  function rate() { return S.boss ? DANGER_RATE * 1.2 : DANGER_RATE; }
+  function rate() {
+    const ramp = 1 + 0.3 * (S.pos / S.text.length);   // the chaser keeps speeding up
+    return (S.boss ? DANGER_RATE * 1.2 : DANGER_RATE) * ramp;
+  }
 
   function spawn(dur) {
     const fall = dur || Math.max(1.6, 2.6 - Math.min(15, S.level.lesson) * 0.04);
@@ -481,7 +484,7 @@ const Game = (() => {
     const cps = S.ema * 1.05; // keys per second (steady state of the decay above)
     const type = S.level.type;
     const running = S.anim === 'run' || S.anim === 'ready' || S.anim === 'win';
-    let target = S.anim === 'ready' ? 0 : 50 + Math.min(cps, 8) * 45;
+    let target = S.anim === 'ready' ? 0 : 35 + Math.min(cps, 10) * 70;
     if (sprinting()) target *= 1.3;
     if (S.anim === 'win') target = 420;
     if (S.anim === 'lose') target = 0;
@@ -489,7 +492,8 @@ const Game = (() => {
     if (type === 'boulder' || type === 'vine') target = 0;
     S.speed += (target - S.speed) * Math.min(1, dt * 4);
     S.cam += S.speed * dt;
-    S.phase += dt * (4 + S.speed / 32);
+    S.phase += dt * (3 + S.speed / 26);
+    S.beastPhase = (S.beastPhase || 0) + dt * (9 + rate() * 0.6);
     if (type === 'vine') S.climb += dt * (2 + cps * 2.5);
     S.climbShown += (S.pos / S.text.length - S.climbShown) * Math.min(1, dt * 5);
     S.shownGap = S.shownGap == null ? S.gap : S.shownGap + (S.gap - S.shownGap) * Math.min(1, dt * 6);
@@ -531,7 +535,7 @@ const Game = (() => {
   function playerScreen() {
     const sm = VW < 700;
     let x = VW * (sm ? 0.6 : 0.58);
-    if (S && S.level.type === 'boulder') x = VW * 0.5;
+    if (S && S.level.type === 'boulder') x = VW * 0.5 + (S.anim === 'win' ? Math.min(1, S.animT) * 150 : 0);
     if (S && S.t - S.dashT < 0.35) x += Math.sin((S.t - S.dashT) / 0.35 * Math.PI) * 30;
     if (S && S.anim === 'win' && S.level.type !== 'vine') x += S.animT * S.animT * 160;
     return { x, y: VH * 0.8 + VH * 0.005 };
@@ -565,7 +569,7 @@ const Game = (() => {
 
     // pose
     let pose;
-    const sp = Math.min(1.4, S.speed / 260 + 0.35);
+    const sp = Math.min(1.6, S.speed / 320 + 0.3);
     if (type === 'boulder') {
       const strain = S.over && !S.result.reachedEnd ? 1 : Math.max(0, 1 - S.strength / 100);
       pose = S.anim === 'win' ? Art.cheerPose(S.t) : Art.holdPose(strain, S.t);
@@ -588,7 +592,10 @@ const Game = (() => {
       if (world.chaser === 'avalanche' || world.chaser === 'lava') Art.drawAvalanche(ctx, gx + 40, ground + 5, VH * (S.boss ? 1.25 : 1), S.t, world.chaser === 'lava');
       else if (world.chaser === 'rollingrock') {
         Art.drawRock(ctx, gx - 10, ground - 70 * s * bs + 2, 70 * s * bs, S.cam / 70);
-      } else Art.drawBeast(ctx, world.chaser, gx - 60 * s * bs, ground + 4, s * 0.95 * bs, S.anim === 'win' ? S.t * 3 : S.phase * 0.9 + 1, 1);
+      } else {
+        const lunge = S.t - (S.lungeT || -9) < 0.4 ? Math.sin((S.t - S.lungeT) / 0.4 * Math.PI) * 25 : 0;
+        Art.drawBeast(ctx, world.chaser, gx - 60 * s * bs + lunge, ground + 4, s * 0.95 * bs, S.anim === 'win' ? S.t * 3 : S.beastPhase, 1);
+      }
     }
 
     // speed lines when sprinting
@@ -601,17 +608,21 @@ const Game = (() => {
     }
     drawParts();
 
+    if (type === 'boulder' && S.anim !== 'lose') Art.drawRoof(ctx, world.theme, roofX(P), P.y, roofY(P, s), s, { won: S.anim === 'win', winT: S.animT });
     // the player
     Art.drawPerson(ctx, look, pose, P.x, P.y + jumpY, s, { mood, dizzy: dizzy && hitAgo < 1, sway: Math.sin(S.phase), noShadow: inJump });
     if (inJump) { ctx.fillStyle = 'rgba(0,0,0,0.12)'; Art.ellipse(ctx, P.x, P.y + 3, 30 * s, 5 * s); ctx.fill(); }
     if (dizzy && (hitAgo < 1 || S.anim === 'lose')) Art.drawDizzyStars(ctx, P.x + 20 * s, P.y - 150 * s + (S.anim === 'lose' ? 40 * s : 0), S.t, s);
 
     if (type === 'boulder') {
+      // the runner holds up a roof whose posts have broken
       const strain = Math.max(0, 1 - S.strength / 100);
-      let by = P.y - (196 - strain * 14) * s, bx = P.x + 4 * s;
-      if (S.anim === 'win') { bx += S.animT * 400; by -= Math.sin(Math.min(1, S.animT) * Math.PI) * 120; }
-      if (S.anim === 'lose') { bx += 70 * s; by = Math.min(P.y - 50 * s, by + S.animT * 900); }
-      Art.drawRock(ctx, bx, by, 52 * s, Math.sin(S.t * 30) * 0.02 * strain + (S.anim === 'win' ? S.animT * 6 : 0));
+      let beamY = roofY(P, s);
+      if (S.anim === 'lose') { beamY = Math.min(P.y - 18 * s, beamY + S.animT * S.animT * 1400); Art.drawRoof(ctx, world.theme, roofX(P), P.y, beamY, s, { lost: true }); }
+      if (S.anim === 'lose' && S.animT > 0.2) {
+        ctx.fillStyle = 'rgba(235,228,214,0.9)';
+        for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, r = (40 + S.animT * 90) * s; Art.circle(ctx, P.x + Math.cos(a) * r * 1.4, P.y - 30 * s + Math.sin(a) * r * 0.35, (22 + (i % 3) * 8) * s * Math.max(0, 1.2 - S.animT * 0.4)); ctx.fill(); }
+      }
     }
 
     // falling objects
@@ -654,6 +665,12 @@ const Game = (() => {
     if (S.practice && S.anim === 'ready') banner(t('practiceBanner'), 40);
   }
 
+  // roof position for hold-on levels (stays put when the runner walks out after winning)
+  function roofX(P) { return VW * 0.5; }
+  function roofY(P, s) {
+    const strain = Math.max(0, 1 - S.strength / 100);
+    return P.y - (157 - strain * 14) * s + Math.sin(S.t * 30) * strain * 1.5;
+  }
   function drawVine(look, s, mood, dizzy) {
     const v = Art.drawVineScene(ctx, VW, VH, S.world.theme, S.t, S.climbShown, { simple: S.phone });
     let y = v.bottom - 60 - S.climbShown * (v.bottom - v.top - 120);
