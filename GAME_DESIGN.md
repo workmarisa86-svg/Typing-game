@@ -1,7 +1,7 @@
 # D' Keys to Escaping — Game Design
 
 This file holds the original project briefs so future sessions follow the same plan.
-**Stage 1 and Stage 2 are both built.** The Stage 2 brief is copied in full at the bottom.
+**Stage 1, Stage 2 and the Piano Challenge mode are built.** Their briefs are copied in full below.
 
 ---
 
@@ -122,6 +122,71 @@ Read GAME_DESIGN.md first and keep everything from Stage 1 working. Now build St
      - Add a version number so updates show up after a refresh.
 
 Update the README and commit everything to the main branch when done.
+
+## Feedback after Stage 2 (built)
+
+- Chases: the runner stays in place but runs faster, and the background rolls by faster as you type faster. The chaser gains steadily and speeds up about 30% by the finish line. Mistakes let it catch up more.
+- Hold-on levels: instead of holding a boulder (which looked unrealistic), the runner holds up the roof of a house or hut whose posts have broken. If you let go, the roof falls (cartoon collapse with a dust cloud and dizzy stars, family friendly). This replaces every boulder level in all worlds.
+
+## Piano Challenge brief (verbatim)
+
+NEW MODE: PIANO CHALLENGE
+Inspired by the phone game Piano Tiles, but played with the keyboard. Add it as its own button on the main menu.
+
+HOW IT PLAYS
+- The player picks a piano piece. Tiles fall down in columns. Each column belongs to one letter key, and each tile shows its letter.
+- Pressing the correct key when a tile reaches the hit line plays the next note(s) of the piece, so the music plays perfectly as long as the player keeps hitting the right keys. If the player stops, the music pauses.
+- Wrong key or a missed tile: the tile flashes red with a short wrong-note sound.
+  - Challenge mode: 3 misses ends the song; show results.
+  - Practice mode (from the profile's settings): no game over, the tile waits until the correct key is pressed.
+- Speed slowly increases during a song, like Piano Tiles.
+- Chords: when the piece has several notes at once, one key press plays the whole chord.
+- Score, combo counter, accuracy, and 1 to 3 stars per song. Earn coins that work in the wardrobe shop. Stats are saved per profile.
+
+KEYS AND DIFFICULTY (this mode also trains typing)
+- Beginner: 2 columns, F and J
+- Easy: 4 columns, D F J K
+- Medium: 6 columns, S D F J K L
+- Hard and Expert: 8 columns, A S D F J K L ;
+- Phone mode: up to 4 columns, letters only, typed with the phone keyboard; the play area must fit above the keyboard.
+- The tile pattern must follow the melody's shape: higher notes go to columns further right, lower notes further left.
+
+SONGS (unlock in order; finishing a song unlocks the next)
+Use ONLY these pieces. All are public domain. Do not add any other songs or composers.
+
+Beginner (traditional songs and hymns):
+Hot Cross Buns; Mary Had a Little Lamb; Twinkle Twinkle Little Star; Jesus Loves Me (William Bradbury); Amazing Grace; Row, Row, Row Your Boat; London Bridge; Frère Jacques; Old MacDonald; Baa Baa Black Sheep; This Old Man; Yankee Doodle; Oh! Susanna; When the Saints Go Marching In; Jingle Bells; Silent Night; Holy, Holy, Holy
+
+Easy:
+See the Conquering Hero Comes (Handel); Largo "Ombra mai fù" (Handel); Hallelujah Chorus melody (Handel); Sheep May Safely Graze melody (Bach); Sleepers, Wake! chorale melody (Bach)
+
+Medium:
+Jesu, Joy of Man's Desiring (Bach); Air on the G String (Bach); Sarabande in D minor HWV 437 (Handel); Alla Hornpipe from Water Music (Handel); Mozart Piano Sonata in C major K. 545, 2nd movement (Andante); Mozart K. 545, 1st movement, opening theme only
+
+Hard:
+Prelude in C Major BWV 846 (Bach); Little Prelude in C minor BWV 999 (Bach); Bourrée in E minor BWV 996 (Bach); Badinerie BWV 1067 (Bach); Arrival of the Queen of Sheba (Handel); The Harmonious Blacksmith (Handel); Mozart K. 545, 3rd movement (Rondo)
+
+Expert:
+Inventions No. 1, 4, 8, 13, and 14 (Bach); Prelude in C minor BWV 847 from the Well-Tempered Clavier (Bach); Italian Concerto BWV 971, 1st movement (Bach); Toccata and Fugue in D minor BWV 565 (traditionally credited to Bach); Passacaglia in G minor HWV 432 (Handel); Mozart K. 545, 1st movement, full version with all the scales
+
+Mozart rule: the ONLY Mozart piece is the Piano Sonata in C major, K. 545 (the one whose 1st movement starts C-E-G-B-C-D-C). Do not include any other Mozart work.
+Each song shows its title, composer, and difficulty. Easier versions may be simplified, but must still sound like the real piece.
+
+ACCURATE NOTES — VERY IMPORTANT
+- Do NOT write melodies from memory. Get the notes from public-domain MIDI or MusicXML files, such as the Mutopia Project (mutopiaproject.org), convert them to a simple song format in the repo, and note each file's source and license in a CREDITS file.
+- If a needed file can't be downloaded, write that song's notes very carefully, test that it sounds correct, and mark it in the README as "needs checking."
+
+REAL PIANO SOUND
+- Use a real recorded piano sound, not beeps. Use a free-license piano sample set (for example the Salamander Grand Piano samples) played with the Web Audio API or Tone.js, and credit it in CREDITS.
+- Load only the notes needed, keep the download small, and make the sounds available offline through the existing "dkeys-" service worker cache.
+- Volume control in settings.
+
+SCREEN DESIGN
+- Same polished flat cartoon style as the rest of the game, but on a clean piano theme: dark background, white and glowing tiles, a keyboard row at the bottom showing which letter is each column.
+- Song selection screen grouped by difficulty with locked and unlocked songs, stars earned, and best score.
+- Works in English and Spanish menus, and on laptop, tablet, and phone.
+
+Update the README, bump the service worker version so players get the update, and commit everything to the main branch when done.
 
 ## Ideas for a future Stage 3 (not requested yet)
 

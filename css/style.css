@@ -383,3 +383,49 @@ button { font-family: inherit; }
 }
 @media (max-width: 480px) { .hide-xs, .topbar .tb-name { display: none; } .topbar .btn-small { padding: 7px 8px; } }
 @media (max-width: 560px) { .start-inner { padding-top: 58px !important; } }
+
+/* ---------- Piano Challenge ---------- */
+.btn-piano { background: linear-gradient(#3a4470, #1e2440); border: 2px solid #7fe3ff; }
+.piano-theme { background: #0d1226; }
+.pm-intro { margin: 0; opacity: 0.85; }
+.pm-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+.pm-head h3 { margin: 0; font-size: 1.3rem; }
+.pm-keys { display: flex; gap: 4px; }
+.pm-key { background: #fff; color: var(--ink); border: 2px solid var(--ink); border-radius: 6px; font-weight: 700; padding: 0 7px; font-size: 0.85rem; }
+.pm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.pm-song { text-align: left; border: 3px solid transparent; border-radius: 14px; padding: 10px 12px; cursor: pointer; font: inherit; color: var(--ink);
+  background: linear-gradient(#ffffff, #dfe6f5); display: flex; flex-direction: column; gap: 2px; box-shadow: 0 4px 0 rgba(0,0,0,0.35); }
+.pm-song small { color: #4a5578; }
+.pm-song .pm-stars { color: #f5a623; letter-spacing: 2px; }
+.pm-song .pm-best { font-weight: 600; }
+.pm-song.done { background: linear-gradient(#ffffff, #d4f5d0); }
+.pm-song.next { border-color: #29b6f6; box-shadow: 0 4px 0 rgba(0,0,0,0.35), 0 0 16px rgba(127,227,255,0.6); }
+.pm-song.locked { background: #3a4466; color: #aab3cc; cursor: not-allowed; box-shadow: none; }
+.pm-song.locked small { color: #8e98b5; }
+.pp-hud { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--navy); flex: none; }
+.pp-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.pp-info b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pp-info small { opacity: 0.75; }
+.pp-stats { display: flex; align-items: center; gap: 12px; }
+.pp-stats b { font-size: 1.5rem; min-width: 60px; text-align: right; }
+.pp-lives { color: #ff6b81; font-size: 1.3rem; letter-spacing: 2px; }
+.pp-combo { color: #7fe3ff; font-weight: 700; min-width: 80px; }
+.pp-progress { height: 6px; background: #1b2338; flex: none; }
+.pp-progress div { height: 100%; width: 0; background: linear-gradient(90deg, #29b6f6, #7fe3ff); transition: width .2s; }
+.pp-stage { position: relative; flex: 1; min-height: 0; }
+#piano-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.pp-loading { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: var(--gold-2); color: var(--ink); padding: 4px 14px; border-radius: 99px; font-weight: 700; }
+.pp-keys { flex: none; display: flex; justify-content: center; gap: 6px; padding: 8px 10px 12px; background: #0b0f1c; }
+.pp-key { width: min(13vw, 120px); height: 52px; background: linear-gradient(#ffffff, #d9e0ef); color: var(--ink); border: 3px solid var(--ink); border-radius: 0 0 12px 12px;
+  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.4rem; box-shadow: 0 5px 0 #3a4466; }
+.pp-key.next { border-color: #29b6f6; box-shadow: 0 5px 0 #3a4466, 0 0 14px rgba(127,227,255,0.8); }
+.pp-key.down { animation: keyDown .15s; }
+@keyframes keyDown { 50% { transform: translateY(4px); box-shadow: 0 1px 0 #3a4466; } }
+#piano-input { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: 0; padding: 0; }
+.vol-wrap { display: flex; align-items: center; gap: 8px; }
+.vol { width: 160px; accent-color: var(--gold); }
+@media (max-width: 640px) {
+  .pp-key { height: 44px; font-size: 1.15rem; }
+  .pp-stats b { font-size: 1.2rem; min-width: 40px; }
+  .pp-combo { min-width: 0; font-size: 0.85rem; }
+}

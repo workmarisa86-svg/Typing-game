@@ -9,7 +9,7 @@
  * Bump VERSION whenever the game changes; the new worker installs, takes over, and old
  * "dkeys-" caches are removed, so a refresh shows the update.
  */
-const VERSION = '2.0.0';
+const VERSION = '3.0.0';
 const PREFIX = 'dkeys-';
 const CACHE = PREFIX + 'app-' + VERSION;
 const FONT_CACHE = PREFIX + 'fonts-v1';
@@ -18,6 +18,11 @@ const SCOPE = self.registration.scope; // e.g. https://user.github.io/Typing-gam
 const APP_FILES = [
   './', 'index.html', 'manifest.webmanifest', 'css/style.css',
   'js/i18n.js', 'js/data.js', 'js/data2.js', 'js/store.js', 'js/art.js', 'js/game.js', 'js/ui.js',
+  'js/songs.js', 'js/piano.js',
+  // Piano Challenge samples (Salamander Grand Piano, see CREDITS.md)
+  'audio/piano/A2.mp3', 'audio/piano/A3.mp3', 'audio/piano/A4.mp3', 'audio/piano/A5.mp3', 'audio/piano/A6.mp3', 'audio/piano/C2.mp3', 'audio/piano/C3.mp3',
+  'audio/piano/C4.mp3', 'audio/piano/C5.mp3', 'audio/piano/C6.mp3', 'audio/piano/C7.mp3', 'audio/piano/Ds2.mp3', 'audio/piano/Ds3.mp3', 'audio/piano/Ds4.mp3',
+  'audio/piano/Ds5.mp3', 'audio/piano/Ds6.mp3', 'audio/piano/Fs2.mp3', 'audio/piano/Fs3.mp3', 'audio/piano/Fs4.mp3', 'audio/piano/Fs5.mp3', 'audio/piano/Fs6.mp3',
   'data/verses-en.js', 'data/verses-es.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-192.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png'
 ];

@@ -765,6 +765,72 @@ const Art = (() => {
     return ground;
   }
 
+  // ---------- hold-on roof (the posts broke; the runner holds it up) ----------
+  const ROOFS = {
+    wood: { post: '#8d5a2b', beam: '#7a4a24', roof: '#c0392b', dark: '#922b21', style: 'shingle' },
+    thatch: { post: '#b59a4a', beam: '#8c6d2e', roof: '#d9b45a', dark: '#b08d3a', style: 'thatch' },
+    tile: { post: '#8d5a2b', beam: '#7a4a24', roof: '#c8643c', dark: '#9c4a2a', style: 'tile' },
+    stone: { post: '#7a5236', beam: '#8a8f99', roof: '#9aa0aa', dark: '#757b86', style: 'stone' },
+    castle: { post: '#7a5236', beam: '#a7a9b8', roof: '#8a8c9c', dark: '#6e7080', style: 'stone' },
+    snow: { post: '#8d5a2b', beam: '#7a4a24', roof: '#5d6d7e', dark: '#4a5866', style: 'shingle', snow: true }
+  };
+  const ROOF_OF = { forest: 'wood', summit: 'wood', storm: 'wood', jungle: 'thatch', savanna: 'thatch', plaza: 'tile',
+    cliffs: 'stone', cave: 'stone', volcano: 'stone', castle: 'castle', snow: 'snow' };
+  function drawRoof(ctx, theme, px, ground, beamY, s, o = {}) {
+    const R = ROOFS[ROOF_OF[theme] || 'wood'];
+    const Wd = 175 * s, bh = 18 * s, peak = 112 * s;
+    ctx.save();
+    // broken posts: a stump on each side and the snapped pieces
+    const post = (x, h0, h1, tilt) => {
+      ctx.save(); ctx.translate(x, h0); ctx.rotate(tilt || 0);
+      ctx.beginPath(); ctx.moveTo(-9 * s, 0); ctx.lineTo(-9 * s, h1 - h0); ctx.lineTo(-2 * s, h1 - h0 - 8 * s); ctx.lineTo(3 * s, h1 - h0 + 4 * s); ctx.lineTo(9 * s, h1 - h0 - 6 * s); ctx.lineTo(9 * s, 0); ctx.closePath();
+      fillOut(ctx, R.post, 3); ctx.restore();
+    };
+    post(px - Wd + 22 * s, ground + 2, ground - 70 * s);
+    post(px + Wd - 22 * s, ground + 2, ground - 52 * s);
+    // fallen piece of the right post lying on the ground
+    ctx.save(); ctx.translate(px + Wd + 30 * s, ground - 8 * s); ctx.rotate(-0.08);
+    rrect(ctx, -50 * s, -8 * s, 100 * s, 16 * s, 4 * s); fillOut(ctx, shade(R.post, -0.08), 3); ctx.restore();
+    // a new post slides in when you win
+    if (o.won) {
+      const k = Math.min(1, o.winT * 2.5);
+      const x = px + Wd * 0.62 + (1 - k) * 160 * s;
+      rrect(ctx, x - 10 * s, beamY, 20 * s, ground - beamY + 2, 3 * s); fillOut(ctx, '#a06a3a', 3);
+    }
+    // roof
+    ctx.beginPath();
+    ctx.moveTo(px - Wd - 28 * s, beamY - bh); ctx.lineTo(px, beamY - bh - peak); ctx.lineTo(px + Wd + 28 * s, beamY - bh); ctx.closePath();
+    fillOut(ctx, R.roof, 3.5);
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = R.dark; ctx.beginPath(); ctx.moveTo(px, beamY - bh - peak); ctx.lineTo(px + Wd + 30 * s, beamY - bh); ctx.lineTo(px, beamY - bh); ctx.fill();
+    ctx.strokeStyle = shade(R.roof, -0.3); ctx.lineWidth = 2 * s;
+    if (R.style === 'thatch') {
+      for (let i = -12; i <= 12; i++) { ctx.beginPath(); ctx.moveTo(px + i * 14 * s, beamY - bh - peak); ctx.lineTo(px + i * 17 * s, beamY - bh); ctx.stroke(); }
+    } else {
+      for (let r = 1; r < 5; r++) {
+        const y = beamY - bh - r * peak / 5;
+        ctx.beginPath(); ctx.moveTo(px - Wd - 30 * s, y); ctx.lineTo(px + Wd + 30 * s, y); ctx.stroke();
+        if (R.style !== 'shingle') for (let i = -14; i <= 14; i++) { const x = px + i * 22 * s + (r % 2) * 11 * s; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + peak / 5); ctx.stroke(); }
+      }
+    }
+    ctx.restore();
+    if (R.snow) {
+      ctx.fillStyle = '#ffffff'; ctx.beginPath();
+      ctx.moveTo(px - Wd * 0.55, beamY - bh - peak * 0.45); ctx.lineTo(px, beamY - bh - peak - 6 * s); ctx.lineTo(px + Wd * 0.55, beamY - bh - peak * 0.45);
+      ctx.quadraticCurveTo(px, beamY - bh - peak * 0.62, px - Wd * 0.55, beamY - bh - peak * 0.45); ctx.fill();
+    }
+    if (ROOF_OF[theme] === 'castle') {
+      for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.rect(px + i * 30 * s - 9 * s, beamY - bh - peak - 14 * s + Math.abs(i) * 22 * s, 18 * s, 16 * s); fillOut(ctx, R.roof, 3); }
+    }
+    // the beam the runner is holding
+    rrect(ctx, px - Wd - 10 * s, beamY - bh, Wd * 2 + 20 * s, bh, 4 * s); fillOut(ctx, R.beam, 3.5);
+    ctx.fillStyle = shade(R.beam, 0.18); ctx.fillRect(px - Wd - 6 * s, beamY - bh + 3 * s, Wd * 2 + 12 * s, 3 * s);
+    if (o.lost) {
+      ctx.fillStyle = 'rgba(0,0,0,0.12)'; ellipse(ctx, px, ground + 2, Wd, 10 * s); ctx.fill();
+    }
+    ctx.restore();
+  }
+
   // vertical scene for vine climbing levels
   function drawVineScene(ctx, W, H, themeId, t, climb, opt = {}) {
     const T = THEMES[themeId] || THEMES.forest;
@@ -805,7 +871,7 @@ const Art = (() => {
   return {
     SKINS, HAIR_COLORS, OUTFIT_COLORS, BOTTOM_COLORS, SHOE_COLORS, OPTIONS, THEMES, defaultLook,
     runPose, idlePose, FALL_POSE, holdPose, hangPose, cheerPose, mixPose,
-    drawPerson, drawBeast, drawAvalanche, drawRock, drawFaller, drawDizzyStars, drawScene, drawVineScene,
+    drawPerson, drawBeast, drawRoof, drawAvalanche, drawRock, drawFaller, drawDizzyStars, drawScene, drawVineScene,
     star, circle, ellipse, fillOut, shade, hash
   };
 })();
