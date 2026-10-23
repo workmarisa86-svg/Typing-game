@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#24304d">
+  <title>D' Keys to Escaping</title>
+  <meta name="description" content="A touch typing adventure: type fast and accurately to escape wolves, avalanches and falling rocks.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- START -->
+  <section id="scr-start" class="screen active">
+    <canvas id="start-bg" class="bg-canvas"></canvas>
+    <div class="start-inner">
+      <h1 class="logo">
+        <span class="logo-keys"><span class="kc">D'</span></span>
+        <span class="logo-text">Keys to Escaping</span>
+      </h1>
+      <p class="tagline">Type fast. Type true. Get away!</p>
+      <div class="panel profiles-panel">
+        <h2>Who is playing?</h2>
+        <div id="profile-list" class="profile-list"></div>
+        <button id="btn-new" class="btn btn-gold">+ New player</button>
+      </div>
+      <button id="btn-guide-start" class="btn">⌨ Key Guide</button>
+    </div>
+  </section>
+
+  <!-- CREATE PROFILE -->
+  <section id="scr-create" class="screen">
+    <div class="create-wrap">
+      <div class="create-preview panel">
+        <canvas id="create-canvas" width="300" height="360"></canvas>
+      </div>
+      <div class="create-form panel">
+        <h2>Create your runner</h2>
+        <label class="field">Name <input id="c-name" maxlength="16" placeholder="Your name" autocomplete="off"></label>
+        <div class="opt-group"><div class="opt-label">1. Choose</div><div id="c-gender" class="seg"></div></div>
+        <div id="c-rest">
+          <div class="opt-group"><div class="opt-label">Skin tone</div><div id="c-skin" class="swatches"></div></div>
+          <div class="opt-group"><div class="opt-label">Hairstyle</div><div id="c-hair" class="seg wrap"></div></div>
+          <div class="opt-group"><div class="opt-label">Hair color</div><div id="c-haircolor" class="swatches"></div></div>
+          <div class="opt-group"><div class="opt-label">Top</div><div id="c-top" class="seg wrap"></div></div>
+          <div class="opt-group"><div class="opt-label">Top color</div><div id="c-topcolor" class="swatches"></div></div>
+          <div class="opt-group"><div class="opt-label" id="c-bottom-label">Bottom</div><div id="c-bottom" class="seg wrap"></div></div>
+          <div class="opt-group"><div class="opt-label">Bottom color</div><div id="c-bottomcolor" class="swatches"></div></div>
+          <div class="opt-group"><div class="opt-label">Shoes</div><div id="c-shoes" class="swatches"></div></div>
+        </div>
+        <div class="row-btns">
+          <button id="c-cancel" class="btn btn-ghost">Back</button>
+          <button id="c-save" class="btn btn-gold">Save &amp; continue</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MAP -->
+  <section id="scr-map" class="screen">
+    <header class="topbar">
+      <canvas id="map-avatar" width="60" height="60"></canvas>
+      <div class="tb-name"><b id="map-name"></b><small id="map-mode"></small></div>
+      <div class="tb-stat"><span class="coin"></span><b id="map-coins">0</b></div>
+      <div class="tb-stat"><span class="star-ico">★</span><b id="map-stars">0</b></div>
+      <div class="tb-spacer"></div>
+      <button id="btn-map-guide" class="btn btn-small" title="Key Guide">⌨<span class="hide-sm"> Keys</span></button>
+      <button id="btn-map-settings" class="btn btn-small" title="Settings">⚙<span class="hide-sm"> Settings</span></button>
+      <button id="btn-map-switch" class="btn btn-small" title="Switch player">⇄<span class="hide-sm"> Player</span></button>
+    </header>
+    <div id="map-scroll"><div id="map-inner"></div></div>
+  </section>
+
+  <!-- GAME -->
+  <section id="scr-game" class="screen">
+    <div id="stage">
+      <canvas id="scene"></canvas>
+      <div class="hud">
+        <div class="hud-panel hud-left">
+          <div class="heart"></div>
+          <div class="hud-col">
+            <div class="hud-label">STRENGTH</div>
+            <div class="bar"><div id="hud-strength" class="bar-fill"></div></div>
+          </div>
+        </div>
+        <div class="hud-center">
+          <div id="tiles" class="tiles"></div>
+          <div id="streak" class="streak"></div>
+        </div>
+        <div class="hud-panel hud-right">
+          <div class="coin big"></div><b id="hud-coins">0</b>
+          <div class="hud-col">
+            <div class="hud-label">ESCAPE</div>
+            <div class="escape"><div class="escape-line"></div><div id="esc-danger" class="dot red"></div><div id="esc-me" class="dot blue"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="game-btns">
+        <button id="btn-help" class="round-btn" title="Key help">?</button>
+        <button id="btn-pause" class="round-btn" title="Pause">❚❚</button>
+      </div>
+      <div id="level-tag" class="level-tag"></div>
+      <div id="tap-hint" class="tap-hint">Tap here to open the keyboard</div>
+    </div>
+    <div id="textline" class="textline"></div>
+    <div id="kbd-area" class="kbd-area">
+      <div id="hand-l" class="hand left"></div>
+      <div id="kbd" class="kbd"></div>
+      <div id="hand-r" class="hand right"></div>
+    </div>
+    <input id="hidden-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="next" aria-label="Typing input">
+  </section>
+
+  <!-- KEY GUIDE -->
+  <section id="scr-guide" class="screen">
+    <header class="topbar">
+      <button id="btn-guide-back" class="btn btn-small">← Back</button>
+      <h2 class="tb-title">Key Guide</h2>
+    </header>
+    <div class="guide-scroll">
+      <div class="guide-intro panel">
+        <p><b>Home row:</b> rest your fingers on <b>A S D F</b> and <b>J K L ;</b>. Feel the bumps on <b>F</b> and <b>J</b> — that is how you find home without looking.
+          Each key is colored by the finger that presses it. Thumbs press the space bar.</p>
+        <div id="guide-legend" class="legend"></div>
+      </div>
+      <div id="guide-cards" class="guide-cards"></div>
+    </div>
+  </section>
+
+  <!-- MODAL -->
+  <div id="modal" class="modal hidden"><div id="modal-box" class="modal-box panel"></div></div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/store.js"></script>
+<script src="js/art.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
