@@ -6,6 +6,12 @@
   <meta name="theme-color" content="#24304d">
   <title>D' Keys to Escaping</title>
   <meta name="description" content="A touch typing adventure: type fast and accurately to escape wolves, avalanches and falling rocks.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="D' Keys">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap">
   <link rel="stylesheet" href="css/style.css">
@@ -16,18 +22,24 @@
   <!-- START -->
   <section id="scr-start" class="screen active">
     <canvas id="start-bg" class="bg-canvas"></canvas>
+    <div class="lang-switch"><button id="lang-en">EN</button><button id="lang-es">ES</button></div>
     <div class="start-inner">
       <h1 class="logo">
         <span class="logo-keys"><span class="kc">D'</span></span>
         <span class="logo-text">Keys to Escaping</span>
       </h1>
-      <p class="tagline">Type fast. Type true. Get away!</p>
+      <p class="tagline" data-i18n="tagline">Type fast. Type true. Get away!</p>
       <div class="panel profiles-panel">
-        <h2>Who is playing?</h2>
+        <h2 data-i18n="whoPlaying">Who is playing?</h2>
         <div id="profile-list" class="profile-list"></div>
-        <button id="btn-new" class="btn btn-gold">+ New player</button>
+        <button id="btn-new" class="btn btn-gold" data-i18n="newPlayer">+ New player</button>
       </div>
-      <button id="btn-guide-start" class="btn">⌨ Key Guide</button>
+      <div class="start-btns">
+        <button id="btn-guide-start" class="btn" data-i18n="keyGuide">⌨ Key Guide</button>
+        <button id="btn-parent" class="btn" data-i18n="parentView">👪 Parent view</button>
+        <button id="btn-install" class="btn btn-green hidden" data-i18n="installApp">⬇ Install app</button>
+      </div>
+      <small id="version" class="version"></small>
     </div>
   </section>
 
@@ -38,22 +50,22 @@
         <canvas id="create-canvas" width="300" height="360"></canvas>
       </div>
       <div class="create-form panel">
-        <h2>Create your runner</h2>
-        <label class="field">Name <input id="c-name" maxlength="16" placeholder="Your name" autocomplete="off"></label>
-        <div class="opt-group"><div class="opt-label">1. Choose</div><div id="c-gender" class="seg"></div></div>
+        <h2 data-i18n="createTitle">Create your runner</h2>
+        <label class="field"><span data-i18n="nameLabel">Name</span> <input id="c-name" maxlength="16" autocomplete="off"></label>
+        <div class="opt-group"><div class="opt-label" data-i18n="choose1">1. Choose</div><div id="c-gender" class="seg"></div></div>
         <div id="c-rest">
-          <div class="opt-group"><div class="opt-label">Skin tone</div><div id="c-skin" class="swatches"></div></div>
-          <div class="opt-group"><div class="opt-label">Hairstyle</div><div id="c-hair" class="seg wrap"></div></div>
-          <div class="opt-group"><div class="opt-label">Hair color</div><div id="c-haircolor" class="swatches"></div></div>
-          <div class="opt-group"><div class="opt-label">Top</div><div id="c-top" class="seg wrap"></div></div>
-          <div class="opt-group"><div class="opt-label">Top color</div><div id="c-topcolor" class="swatches"></div></div>
+          <div class="opt-group"><div class="opt-label" data-i18n="skinTone">Skin tone</div><div id="c-skin" class="swatches"></div></div>
+          <div class="opt-group"><div class="opt-label" data-i18n="hairstyle">Hairstyle</div><div id="c-hair" class="seg wrap"></div></div>
+          <div class="opt-group"><div class="opt-label" data-i18n="hairColor">Hair color</div><div id="c-haircolor" class="swatches"></div></div>
+          <div class="opt-group"><div class="opt-label" data-i18n="topLabel">Top</div><div id="c-top" class="seg wrap"></div></div>
+          <div class="opt-group"><div class="opt-label" data-i18n="topColor">Top color</div><div id="c-topcolor" class="swatches"></div></div>
           <div class="opt-group"><div class="opt-label" id="c-bottom-label">Bottom</div><div id="c-bottom" class="seg wrap"></div></div>
-          <div class="opt-group"><div class="opt-label">Bottom color</div><div id="c-bottomcolor" class="swatches"></div></div>
-          <div class="opt-group"><div class="opt-label">Shoes</div><div id="c-shoes" class="swatches"></div></div>
+          <div class="opt-group"><div class="opt-label" data-i18n="bottomColor">Bottom color</div><div id="c-bottomcolor" class="swatches"></div></div>
+          <div class="opt-group"><div class="opt-label" data-i18n="shoes">Shoes</div><div id="c-shoes" class="swatches"></div></div>
         </div>
         <div class="row-btns">
-          <button id="c-cancel" class="btn btn-ghost">Back</button>
-          <button id="c-save" class="btn btn-gold">Save &amp; continue</button>
+          <button id="c-cancel" class="btn btn-ghost" data-i18n="back">Back</button>
+          <button id="c-save" class="btn btn-gold" data-i18n="saveContinue">Save &amp; continue</button>
         </div>
       </div>
     </div>
@@ -65,11 +77,14 @@
       <canvas id="map-avatar" width="60" height="60"></canvas>
       <div class="tb-name"><b id="map-name"></b><small id="map-mode"></small></div>
       <div class="tb-stat"><span class="coin"></span><b id="map-coins">0</b></div>
-      <div class="tb-stat"><span class="star-ico">★</span><b id="map-stars">0</b></div>
+      <div class="tb-stat hide-xs"><span class="star-ico">★</span><b id="map-stars">0</b></div>
       <div class="tb-spacer"></div>
-      <button id="btn-map-guide" class="btn btn-small" title="Key Guide">⌨<span class="hide-sm"> Keys</span></button>
-      <button id="btn-map-settings" class="btn btn-small" title="Settings">⚙<span class="hide-sm"> Settings</span></button>
-      <button id="btn-map-switch" class="btn btn-small" title="Switch player">⇄<span class="hide-sm"> Player</span></button>
+      <button id="btn-map-smart" class="btn btn-small" data-i18n-title="smartPractice">🎯<span class="hide-sm" data-i18n="smartBtn"> Practice</span></button>
+      <button id="btn-map-shop" class="btn btn-small" data-i18n-title="shopTitle">👕<span class="hide-sm" data-i18n="shopBtn"> Shop</span></button>
+      <button id="btn-map-stats" class="btn btn-small" data-i18n-title="statsTitle">📊<span class="hide-sm" data-i18n="statsBtn"> Stats</span></button>
+      <button id="btn-map-guide" class="btn btn-small" data-i18n-title="keyGuideTitle">⌨<span class="hide-sm" data-i18n="keysBtn"> Keys</span></button>
+      <button id="btn-map-settings" class="btn btn-small" data-i18n-title="settingsBtn">⚙<span class="hide-sm" data-i18n="settingsBtn"> Settings</span></button>
+      <button id="btn-map-switch" class="btn btn-small" data-i18n-title="playerBtn">⇄<span class="hide-sm" data-i18n="playerBtn"> Player</span></button>
     </header>
     <div id="map-scroll"><div id="map-inner"></div></div>
   </section>
@@ -82,7 +97,7 @@
         <div class="hud-panel hud-left">
           <div class="heart"></div>
           <div class="hud-col">
-            <div class="hud-label">STRENGTH</div>
+            <div class="hud-label" data-i18n="strength">STRENGTH</div>
             <div class="bar"><div id="hud-strength" class="bar-fill"></div></div>
           </div>
         </div>
@@ -93,19 +108,20 @@
         <div class="hud-panel hud-right">
           <div class="coin big"></div><b id="hud-coins">0</b>
           <div class="hud-col">
-            <div class="hud-label">ESCAPE</div>
+            <div class="hud-label" data-i18n="escape">ESCAPE</div>
             <div class="escape"><div class="escape-line"></div><div id="esc-danger" class="dot red"></div><div id="esc-me" class="dot blue"></div></div>
           </div>
         </div>
       </div>
       <div class="game-btns">
-        <button id="btn-help" class="round-btn" title="Key help">?</button>
-        <button id="btn-pause" class="round-btn" title="Pause">❚❚</button>
+        <button id="btn-help" class="round-btn" data-i18n-title="keyHelp">?</button>
+        <button id="btn-pause" class="round-btn" data-i18n-title="paused">❚❚</button>
       </div>
       <div id="level-tag" class="level-tag"></div>
-      <div id="tap-hint" class="tap-hint">Tap here to open the keyboard</div>
+      <div id="tap-hint" class="tap-hint" data-i18n="tapHint">Tap here to open the keyboard</div>
     </div>
     <div id="textline" class="textline"></div>
+    <div id="verse-ref" class="verse-ref"></div>
     <div id="kbd-area" class="kbd-area">
       <div id="hand-l" class="hand left"></div>
       <div id="kbd" class="kbd"></div>
@@ -117,24 +133,62 @@
   <!-- KEY GUIDE -->
   <section id="scr-guide" class="screen">
     <header class="topbar">
-      <button id="btn-guide-back" class="btn btn-small">← Back</button>
-      <h2 class="tb-title">Key Guide</h2>
+      <button id="btn-guide-back" class="btn btn-small" data-i18n="back">Back</button>
+      <h2 class="tb-title" data-i18n="keyGuideTitle">Key Guide</h2>
     </header>
     <div class="guide-scroll">
       <div class="guide-intro panel">
-        <p><b>Home row:</b> rest your fingers on <b>A S D F</b> and <b>J K L ;</b>. Feel the bumps on <b>F</b> and <b>J</b> — that is how you find home without looking.
-          Each key is colored by the finger that presses it. Thumbs press the space bar.</p>
+        <p data-i18n="guideIntro"></p>
         <div id="guide-legend" class="legend"></div>
       </div>
       <div id="guide-cards" class="guide-cards"></div>
     </div>
   </section>
 
-  <!-- MODAL -->
-  <div id="modal" class="modal hidden"><div id="modal-box" class="modal-box panel"></div></div>
-</div>
+  <!-- SHOP -->
+  <section id="scr-shop" class="screen">
+    <header class="topbar">
+      <button class="btn btn-small btn-back-map" data-i18n="back">Back</button>
+      <h2 class="tb-title" data-i18n="shopTitle">Wardrobe shop</h2>
+      <div class="tb-spacer"></div>
+      <div class="tb-stat"><span class="coin"></span><b id="shop-coins">0</b></div>
+    </header>
+    <div class="shop-wrap">
+      <div class="create-preview panel"><canvas id="shop-canvas" width="300" height="360"></canvas></div>
+      <div class="panel shop-panel">
+        <div id="shop-tabs" class="seg wrap shop-tabs"></div>
+        <div id="shop-items" class="shop-items"></div>
+      </div>
+    </div>
+  </section>
 
+  <!-- STATS -->
+  <section id="scr-stats" class="screen">
+    <header class="topbar">
+      <button class="btn btn-small btn-back-map" data-i18n="back">Back</button>
+      <h2 class="tb-title" data-i18n="statsTitle">Stats</h2>
+    </header>
+    <div class="page-scroll"><div id="stats-body" class="page-body"></div></div>
+  </section>
+
+  <!-- PARENT VIEW -->
+  <section id="scr-parent" class="screen">
+    <header class="topbar">
+      <button id="btn-parent-back" class="btn btn-small" data-i18n="back">Back</button>
+      <h2 class="tb-title" data-i18n="parentTitle">Parent view</h2>
+    </header>
+    <div class="page-scroll"><div id="parent-body" class="page-body"></div></div>
+  </section>
+
+  <!-- MODAL + TOAST -->
+  <div id="modal" class="modal hidden"><div id="modal-box" class="modal-box panel"></div></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</div>
+<div id="print-area"></div>
+
+<script src="js/i18n.js"></script>
 <script src="js/data.js"></script>
+<script src="js/data2.js"></script>
 <script src="js/store.js"></script>
 <script src="js/art.js"></script>
 <script src="js/game.js"></script>

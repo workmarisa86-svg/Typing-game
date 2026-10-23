@@ -1,50 +1,125 @@
-/* Level list, lesson text generator and the in-level game engine */
+/* Level lists, lesson text generator (English / Spanish / verses) and the in-level game engine */
 'use strict';
 
-// ---------- level list ----------
-const LEVELS = (() => {
+const isLetterChar = ch => /\p{L}/u.test(ch);
+const PHONE_OK = ch => ch === ' ' || isLetterChar(ch);
+const WORLD_BASE_WPM = { castle: 17, plaza: 14, volcano: 13, storm: 11 };
+
+// ---------- level list (depends on typing language and device) ----------
+function buildLevels(opts = {}) {
+  const lang = opts.typeLang || 'en', phone = !!opts.phone;
   const list = [];
+  const learned = new Set();
   WORLDS.forEach((w, wi) => {
-    let n = 0;
-    w.lessons.forEach(li => {
+    if (w.spanishOnly && lang !== 'es') return;
+    if (w.laptopOnly && phone) return;
+    let n = 0, lastMin = 10;
+    const worldStart = list.length;
+    w.lessons.forEach((li, lo) => {
       const L = LESSONS[li];
-      const stages = L.review ? [1, 2, 3, 3] : [0, 1, 2, 3];
+      L.keys.concat(L.extra || []).forEach(k => learned.add(k));
+      if (L.review && li < 16) 'abcdefghijklmnopqrstuvwxyz;,.'.split('').forEach(k => learned.add(k));
+      const stages = L.setup ? [0] : L.review ? [1, 2, 3, 3] : [0, 1, 2, 3];
+      const fresh = (L.review ? [] : L.keys).filter(k => !phone || PHONE_OK(k));
       stages.forEach((stage, si) => {
-        const type = w.mix[n % w.mix.length];
-        const base = 7 + li * 1.0;
-        const minWpm = Math.round(L.review ? 18 + si * 2 : base + stage);
-        list.push({ index: list.length, world: wi, lesson: li, stage, type, minWpm,
-          title: (L.review ? 'Review' : L.name) + ' · ' + STAGE_NAMES[stage] });
+        const type = L.setup ? 'chase' : w.mix[n % w.mix.length];
+        let minWpm;
+        if (li < 16) minWpm = Math.round(L.review ? 18 + si * 2 : 7 + li + stage);
+        else minWpm = Math.round(WORLD_BASE_WPM[w.id] + lo + stage * 0.7 - (L.setup ? 4 : 0));
+        lastMin = minWpm;
+        list.push({ id: w.id + '-' + n, world: wi, lesson: li, stage, type, minWpm, fresh,
+          learned: [...learned], setup: !!L.setup, boss: false });
         n++;
       });
     });
+    list.push({ id: w.id + '-boss', world: wi, lesson: w.lessons[w.lessons.length - 1], stage: 3, type: 'chase',
+      minWpm: lastMin + 1, fresh: [], learned: [...learned], boss: true,
+      worldKeys: list.slice(worldStart).reduce((a, l) => a.concat(l.fresh), []) });
   });
   return list;
-})();
+}
+// The 64 Stage 1 levels in their original order (to move old saves to level ids)
+const STAGE1_IDS = buildLevels({ typeLang: 'en', phone: false }).filter(l => !l.boss && l.world < 7).map(l => l.id);
+
+function levelTitle(l, lang) {
+  if (l.smart) return t('smartPractice');
+  if (l.boss) return t('boss');
+  const L = LESSONS[l.lesson];
+  const name = lang === 'es' ? (L.nameEs || L.name) : L.name;
+  if (l.setup) return name;
+  return name + ' · ' + (lang === 'es' ? STAGE_NAMES_ES : STAGE_NAMES)[l.stage];
+}
+function worldName(w, lang) { return lang === 'es' && WORLD_TEXT_ES[w.id] ? WORLD_TEXT_ES[w.id][0] : w.name; }
+function worldBlurb(w, lang) { return lang === 'es' && WORLD_TEXT_ES[w.id] ? WORLD_TEXT_ES[w.id][1] : w.blurb; }
 
 const TYPE_INFO = {
-  chase: { name: 'Chase', tip: 'Something is running after you. Type fast to pull away!' },
-  falling: { name: 'Falling', tip: 'Things are dropping! Type the keys shown in the ring before they land.' },
-  boulder: { name: 'Hold-on', tip: 'Hold the boulder up! Each correct key gives you strength.' },
-  vine: { name: 'Hold-on', tip: 'Climb the vine! Type to climb; your grip slowly weakens.' }
+  chase: { name: 'typeChase', tip: 'tipChase' },
+  falling: { name: 'typeFalling', tip: 'tipFalling' },
+  boulder: { name: 'typeHold', tip: 'tipBoulder' },
+  vine: { name: 'typeHold', tip: 'tipVine' }
 };
+
+// ---------- verses (loaded on demand from data/verses-xx.js) ----------
+const Verses = (() => {
+  const loading = {};
+  function data(lang) { return lang === 'es' ? window.VERSES_ES : window.VERSES_EN; }
+  function load(lang) {
+    if (data(lang)) return Promise.resolve(data(lang));
+    if (!loading[lang]) {
+      loading[lang] = new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'data/verses-' + (lang === 'es' ? 'es' : 'en') + '.js';
+        s.onload = () => res(data(lang));
+        s.onerror = () => { loading[lang] = null; rej(new Error('verses')); };
+        document.head.append(s);
+      });
+    }
+    return loading[lang];
+  }
+  function ratio(text, allowed) {
+    let n = 0, ok = 0;
+    for (const ch of text) { if (ch === ' ') continue; n++; if (allowed.has(ch)) ok++; }
+    return n ? ok / n : 0;
+  }
+  // pick a verse (or a run of consecutive verses for bosses) that the player can mostly type
+  function pick(lang, allowed, long) {
+    const D = data(lang);
+    if (!D) return null;
+    const v = D.v;
+    let best = [];
+    for (let k = 0; k < 500; k++) {
+      const i = Math.floor(Math.random() * v.length);
+      let parts = [v[i]], len = v[i][3].length;
+      if (long) {
+        for (let j = i + 1; j < v.length && len < 170; j++) {
+          const p = v[j], q = parts[parts.length - 1];
+          if (p[0] !== q[0] || p[1] !== q[1] || p[2] !== q[2] + 1) break;
+          parts.push(p); len += p[3].length + 1;
+        }
+        if (len < 120 || len > 340) continue;
+      } else if (len < 40 || len > 150) continue;
+      const text = parts.map(p => p[3]).join(' ');
+      best.push({ r: ratio(text, allowed), text, parts });
+    }
+    if (!best.length) return null;
+    best.sort((a, b) => b.r - a.r);
+    const top = best.slice(0, 8), c = top[Math.floor(Math.random() * top.length)];
+    const p0 = c.parts[0], pN = c.parts[c.parts.length - 1];
+    const ref = `${D.books[p0[0]]} ${p0[1]}:${p0[2]}${c.parts.length > 1 ? '–' + pN[2] : ''} (${D.version})`;
+    return { text: c.text, ref, ratio: c.r };
+  }
+  return { load, pick };
+})();
 
 // ---------- text generator ----------
 const TextGen = (() => {
   const PUNCT = /[;,.]/;
   const rnd = n => Math.floor(Math.random() * n);
   const pick = a => a[rnd(a.length)];
-  function learned(li, phone) {
-    const set = new Set();
-    for (let i = 0; i <= li && i < LESSONS.length; i++) LESSONS[i].keys.forEach(k => set.add(k));
-    if (LESSONS[li] && LESSONS[li].review) 'abcdefghijklmnopqrstuvwxyz;,.'.split('').forEach(k => set.add(k));
-    if (phone) [';', ',', '.'].forEach(k => set.delete(k));
-    return set;
-  }
+  const upFirst = s => s.replace(/^([¿¡"']*)(\p{L})/u, (m, a, b) => a + b.toUpperCase());
   function fits(str, set) { for (const ch of str) if (ch !== ' ' && !set.has(ch)) return false; return true; }
   function groups(pool, minL, maxL, target) {
-    const out = [];
-    let len = 0;
+    const out = []; let len = 0;
     while (len < target) {
       const n = minL + rnd(maxL - minL + 1);
       let g = '';
@@ -53,72 +128,181 @@ const TextGen = (() => {
     }
     return out.join(' ');
   }
-  function make(level, phone) {
+  function fill(tpl, digits) {
+    const d = () => pick(digits);
+    const nz = digits.filter(x => x !== '0');
+    const n = () => (nz.length ? pick(nz) : d()) + d() + (Math.random() < 0.5 ? d() : '');
+    return tpl.replace(/\{n\}/g, n).replace(/\{d\}/g, d).replace(/\{y\}/g, () => (nz.length ? pick(nz) : '1') + d() + d() + d());
+  }
+  // returns { text, ref?, autoOk? } — autoOk are characters the game types for the player
+  function make(level, lang, phone, verse) {
+    const set = new Set(level.learned.filter(k => !phone || PHONE_OK(k)));
     const L = LESSONS[level.lesson];
-    const set = learned(level.lesson, phone);
-    const letters = [...set].filter(k => !PUNCT.test(k));
-    let fresh = L.keys.filter(k => set.has(k));
-    if (L.review || !fresh.length) fresh = letters.slice();
-    const freshLetters = fresh.filter(k => !PUNCT.test(k));
-    const freshPunct = fresh.filter(k => PUNCT.test(k));
+    const caps = [...set].some(k => /[A-Z]/.test(k));
+    const words = lang === 'es' ? WORDS_ES : WORDS;
+    const sents = lang === 'es' ? SENTENCES_ES : SENTENCES;
+    const lowers = [...set].filter(k => /[a-z]/.test(k));
+    const letters = [...set].filter(k => isLetterChar(k) && k === k.toLowerCase());
+    const fresh = level.boss ? [] : level.fresh;
+    const freshLetters = fresh.filter(k => isLetterChar(k));
+    const freshOther = fresh.filter(k => !isLetterChar(k));
+    const target = level.boss ? 170 : 0;
+
+    // verse mode: sentence levels and bosses use exact Bible verses
+    if (verse && (level.stage === 3 || level.boss) && lowers.length >= 12 && !L.numbers && !L.symbols) {
+      const v = Verses.pick(lang, set, level.boss);
+      if (v) return { text: v.text, ref: v.ref };
+    }
+    if (level.smart) return smart(level, set, words, phone);
+    if (level.setup) return { text: 'ñ ñ ña ñe ñi ño ñu año niño señor mañana' };
+
+    // number & symbol bosses: a long mix of everything learned so far
+    if ((L.numbers || L.symbols) && level.boss) {
+      const digits = [...set].filter(k => /[0-9]/.test(k));
+      const snips = [];
+      [...set].forEach(k => (SYMBOL_SNIPS[lang][k] || []).forEach(x => { if (fits(x, set)) snips.push(x); }));
+      const ss = sents.map(s => caps ? upFirst(s) : s).filter(s => fits(s, set));
+      const out = [];
+      while (out.join(' ').length < 170) {
+        const r = Math.random();
+        if (r < 0.35) out.push(upFirst(fill(pick(NUMBER_TEMPLATES[lang]), digits)));
+        else if (r < 0.65 && snips.length) out.push(pick(snips));
+        else if (ss.length) out.push(pick(ss));
+      }
+      return { text: out.join(' ') };
+    }
+    // numbers world
+    if (L.numbers && !level.boss) {
+      const digits = [...set].filter(k => /[0-9]/.test(k));
+      const fd = fresh.length ? fresh : digits;
+      if (level.stage === 0) return { text: groups(fd, 1, 3, 34) };
+      if (level.stage === 1) return { text: groups(fd.concat(digits), 2, 4, 40) };
+      if (level.stage === 2) {
+        const ws = words.filter(w => fits(w, set));
+        const out = [];
+        while (out.join(' ').length < 44) out.push(Math.random() < 0.5 ? fill('{n}', digits) : pick(ws));
+        return { text: out.join(' ') };
+      }
+      const out = [];
+      while (out.join(' ').length < 55) out.push(fill(pick(NUMBER_TEMPLATES[lang]), digits));
+      return { text: caps ? out.map(upFirst).join(' ') : out.join(' '), autoOk: '' };
+    }
+    // symbols world
+    if (L.symbols && !level.boss) {
+      const syms = [...set].filter(k => !isLetterChar(k) && k !== ' ' && !/[0-9]/.test(k));
+      const fs = fresh.length ? fresh : syms;
+      if (level.stage === 0) return { text: groups(fs, 1, 2, 30) };
+      if (level.stage === 1) {
+        const out = [];
+        while (out.join(' ').length < 40) out.push(Math.random() < 0.5 ? pick(fs) + pick(letters) + pick(letters) : pick(letters) + pick(letters) + pick(fs));
+        return { text: out.join(' ') };
+      }
+      const snips = [];
+      (level.stage === 2 ? fs : syms).forEach(k => (SYMBOL_SNIPS[lang][k] || []).forEach(x => { if (fits(x, set)) snips.push(x); }));
+      const ws = words.filter(w => fits(w, set));
+      const out = [];
+      while (out.join(' ').length < (level.stage === 2 ? 44 : 60)) out.push(snips.length && (level.stage === 2 || Math.random() < 0.6) ? pick(snips) : pick(ws));
+      return { text: out.join(' ') };
+    }
+    // Spanish letters lesson ¿ ¡ : the closing ? and ! are typed for you until the symbols world
+    const autoOk = new Set();
+    if (lang === 'es' && (set.has('¿') || set.has('¡'))) { if (!set.has('?')) autoOk.add('?'); if (!set.has('!')) autoOk.add('!'); }
+    const okSet = new Set([...set, ...autoOk]);
+
+    // capitals lessons, stage 0 and 1
+    if (L.caps && !L.review && level.stage <= 1 && !level.boss) {
+      if (level.stage === 0) {
+        const out = []; let len = 0;
+        while (len < 34) { const g = Math.random() < 0.5 ? pick(fresh) : pick(fresh) + pick(lowers); out.push(g); len += g.length + 1; }
+        return { text: out.join(' ') };
+      }
+      const out = []; let len = 0;
+      while (len < 42) { let g = pick(fresh); for (let i = 0; i < 1 + rnd(3); i++) g += pick(lowers); out.push(g); len += g.length + 1; }
+      return { text: out.join(' ') };
+    }
+
     let text = '';
-    if (level.stage === 0) {
-      const pool = freshLetters.length >= 2 ? freshLetters : freshLetters.concat(letters.slice(0, 4));
-      text = groups(pool.length ? pool : letters, 1, 3, 34);
-      if (freshPunct.length) text = text.split(' ').map((g, i) => i % 2 ? g + freshPunct[0] : g).join(' ');
-    } else if (level.stage === 1) {
+    if (level.stage === 0 && !level.boss) {
+      if (L.spanish) {
+        const vow = 'aeiou'.split('').filter(v => set.has(v));
+        const out = []; let len = 0;
+        while (len < 34) {
+          const k = pick(freshLetters.length ? freshLetters : letters);
+          const g = Math.random() < 0.4 ? k : (/[áéíóú]/i.test(k) ? pick(lowers) + k : k + pick(vow));
+          out.push(g); len += g.length + 1;
+        }
+        text = out.join(' ');
+      } else {
+        const pool = freshLetters.length >= 2 ? freshLetters : freshLetters.concat(letters.slice(0, 4));
+        text = groups(pool.length ? pool : letters, 1, 3, 34);
+        if (freshOther.length) text = text.split(' ').map((g, i) => i % 2 ? g + freshOther[0] : g).join(' ');
+      }
+    } else if (level.stage === 1 && !level.boss) {
       const pool = [];
       freshLetters.forEach(k => { for (let i = 0; i < 4; i++) pool.push(k); });
-      letters.forEach(k => pool.push(k));
+      letters.filter(k => /[a-z]/.test(k)).forEach(k => pool.push(k));
       text = groups(pool, 2, 4, 42);
-      if (freshPunct.length) text = text.split(' ').map((g, i) => i % 3 === 2 ? g + freshPunct[0] : g).join(' ');
+      if (freshOther.length) text = text.split(' ').map((g, i) => i % 3 === 2 ? g + freshOther[0] : g).join(' ');
     } else {
-      let words = WORDS.filter(w => fits(w, set));
-      const withFresh = words.filter(w => freshLetters.some(k => w.includes(k)));
-      if (withFresh.length >= 4) words = withFresh.concat(withFresh, words);
-      if (words.length < 4) {
-        const pool = letters.concat(freshLetters, freshLetters);
-        words = groups(pool, 3, 5, 200).split(' ');
+      let ws = words.filter(w => fits(w, set));
+      const withFresh = ws.filter(w => freshLetters.some(k => w.includes(k.toLowerCase())));
+      if (withFresh.length >= 4) ws = withFresh.concat(withFresh, ws);
+      if (ws.length < 4) ws = groups(letters.concat(freshLetters, freshLetters), 3, 5, 200).split(' ');
+      if (L.caps && level.stage === 2) {
+        const names = NAMES[lang].filter(n => fits(n, set) && (!fresh.length || fresh.some(k => n.includes(k))));
+        const out = [];
+        while (out.join(' ').length < 44) out.push(names.length && Math.random() < 0.55 ? pick(names) : upFirst(pick(ws)));
+        return { text: out.join(' ') };
       }
-      if (level.stage === 2) {
+      if (level.stage === 2 && !level.boss) {
         const out = [];
         while (out.join(' ').length < 44) {
-          let w = pick(words);
+          let w = pick(ws);
           if (out.length && w === out[out.length - 1]) continue;
-          if (freshPunct.length && out.length % 2 === 1) w += freshPunct[0];
+          if (freshOther.length && out.length % 2 === 1) w += freshOther[0];
           out.push(w);
         }
         text = out.join(' ');
       } else {
-        const strip = s => phone ? s.replace(/[;,.]/g, '') : s;
-        let sents = SENTENCES.map(strip).filter(s => fits(s, set));
-        const fresher = sents.filter(s => fresh.some(k => s.includes(k)));
-        if (fresher.length >= 2) sents = fresher;
+        let ss = sents.map(s => phone ? s.replace(/[^\p{L} ]/gu, '').trim() : s).map(s => caps ? upFirst(s) : s).filter(s => fits(s, okSet));
+        const fresher = ss.filter(s => fresh.some(k => s.includes(k)));
+        if (fresher.length >= 2) ss = fresher;
         const out = [];
-        if (sents.length >= 2) {
+        const goal = level.boss ? target : 50;
+        if (ss.length >= 2) {
           const used = new Set();
-          while (out.join(' ').length < 50 && used.size < sents.length) {
-            const s = pick(sents);
+          while (out.join(' ').length < goal && used.size < ss.length) {
+            const s = pick(ss);
             if (used.has(s)) continue;
             used.add(s); out.push(s);
           }
-        } else {
-          for (let k = 0; k < 2; k++) {
-            const ws = [];
-            for (let i = 0; i < 4 + rnd(2); i++) ws.push(pick(withFresh.length >= 4 ? withFresh : words));
-            let s = ws.join(' ');
-            if (set.has(',')) s = ws.slice(0, 2).join(' ') + ', ' + ws.slice(2).join(' ');
-            if (set.has('.')) s += '.';
-            else if (set.has(';') && k === 0) s += ';';
-            out.push(s);
-          }
+        }
+        while (out.join(' ').length < goal * 0.8) {
+          const w = [];
+          for (let i = 0; i < 4 + rnd(2); i++) w.push(pick(withFresh.length >= 4 ? withFresh : ws));
+          let s = w.join(' ');
+          if (set.has(',')) s = w.slice(0, 2).join(' ') + ', ' + w.slice(2).join(' ');
+          if (set.has('.')) s += '.'; else if (set.has(';') && out.length === 0) s += ';';
+          out.push(caps ? upFirst(s) : s);
         }
         text = out.join(' ');
       }
     }
-    return text.replace(/\s+/g, ' ').trim();
+    return { text: text.replace(/\s+/g, ' ').trim(), autoOk: [...autoOk].join('') };
   }
-  return { make, learned };
+  // smart practice: the player's most-missed keys
+  function smart(level, set, words, phone) {
+    const weak = level.keys.filter(k => set.has(k));
+    const lowWeak = weak.map(k => k.toLowerCase());
+    const ws = words.filter(w => fits(w, set) && lowWeak.some(k => w.includes(k)));
+    const out = [];
+    while (out.join(' ').length < 70) {
+      if (ws.length && Math.random() < 0.6) out.push(pick(ws));
+      else { let g = ''; for (let i = 0; i < 2 + rnd(2); i++) g += pick(weak); out.push(g); }
+    }
+    return { text: out.join(' ') };
+  }
+  return { make };
 })();
 
 // ---------- the in-level engine ----------
@@ -129,22 +313,25 @@ const Game = (() => {
 
   function init(cv) { canvas = cv; ctx = cv.getContext('2d'); }
 
-  function start(level, profile, hooks) {
+  // gen = { text, ref, autoOk } from TextGen
+  function start(level, profile, gen, hooks) {
     const st = profile.settings;
     const phone = UI.isPhone();
     const world = WORLDS[level.world];
-    const text = TextGen.make(level, phone);
+    const allowed = new Set(level.learned.filter(k => !phone || PHONE_OK(k)));
+    allowed.add(' ');
     S = {
-      level, world, profile, hooks, phone, text,
-      practice: st.mode === 'practice', winStyle: st.winStyle, blood: st.blood,
+      level, world, profile, hooks, phone, text: gen.text, ref: gen.ref || '', allowed,
+      practice: st.mode === 'practice', winStyle: st.winStyle, blood: st.blood, boss: !!level.boss,
       pos: 0, correct: 0, errors: 0, startT: 0, endT: 0, streak: 0, bestStreak: 0,
-      strength: 100, gap: 55, cam: 0, speed: 0, ema: 0, phase: 0, t: 0,
-      anim: 'ready', animT: 0, hitT: -9, tripT: -9, dashT: -9,
+      strength: 100, gap: level.boss ? 62 : 55, cam: 0, speed: 0, ema: 0, phase: 0, t: 0,
+      anim: 'ready', animT: 0, hitT: -9, tripT: -9, dashT: -9, slipT: -9, reviveT: -9,
       targetCps: level.minWpm * 5 / 60, objs: [], parts: [], lastSpawn: 0,
-      water: [], climb: 0, climbShown: 0, over: false, paused: false, lastKeyT: 0,
-      keyErrors: {}
+      water: [], climb: 0, climbShown: 0, over: false, paused: false, revived: false,
+      keyErrors: {}, keyTries: {}, auto: new Set(), dead: null
     };
-    if (S.level.type === 'chase' || S.level.type === 'falling') for (let i = 1; i < 30; i++) S.water.push(i * 1100 + Art.hash(i) * 300);
+    if (S.level.type === 'chase' || S.level.type === 'falling') for (let i = 1; i < 40; i++) S.water.push(i * 1100 + Art.hash(i) * 300);
+    autoAdvance();
     resize();
     cancelAnimationFrame(raf);
     let last = performance.now();
@@ -167,6 +354,10 @@ const Game = (() => {
     canvas.width = Math.max(1, Math.round(r.width * dpr));
     canvas.height = Math.max(1, Math.round(r.height * dpr));
   }
+  // characters the player hasn't learned yet (or can't type on a phone) are typed automatically
+  function autoAdvance() {
+    while (S.pos < S.text.length && !S.allowed.has(S.text[S.pos])) { S.auto.add(S.pos); S.pos++; }
+  }
 
   function elapsed() { return S.startT ? ((S.endT || performance.now()) - S.startT) / 1000 : 0; }
   function wpm() { const t = elapsed(); return t > 0.5 ? (S.correct / 5) / (t / 60) : 0; }
@@ -186,26 +377,55 @@ const Game = (() => {
       if (S.blood) addParts(p.x, p.y - 70, 10, '#c62828', 0.8);
       addParts(p.x, p.y - 80, 8, '#ffffff', 0.9);
     }
-    if (S.strength <= 0) finish(false);
+    if (S.strength <= 0) outOfStrength();
   }
+  // one revive per level, paid with coins (the UI asks)
+  function outOfStrength() {
+    if (S.over || S.asking) return;
+    if (!S.revived && S.hooks.canRevive && S.hooks.canRevive()) {
+      S.asking = true; S.paused = true;
+      S.hooks.onRevive();
+    } else finish(false);
+  }
+  function revive() {
+    if (!S) return;
+    S.asking = false; S.revived = true; S.paused = false;
+    S.strength = 70; S.gap = Math.max(S.gap, 55); S.reviveT = S.t; S.hitT = -9;
+    S.objs.forEach(o => { o.dodged = true; o.wx = S.cam + playerScreen().x + 140; });
+    addParts(playerScreen().x, playerScreen().y - 80, 16, '#ffd54f', 1.2);
+    Sound.play('revive');
+    S.hooks.onChange(S);
+  }
+  function giveUp() { if (!S) return; S.asking = false; S.paused = false; finish(false); }
 
-  function key(ch) {
+  // info = { shiftL, shiftR } when known (laptop keyboards)
+  function key(ch, info) {
     if (!S || S.over || S.paused) return;
     const want = S.text[S.pos];
     if (!S.startT) { S.startT = performance.now(); S.anim = 'run'; }
-    if (ch === want) {
+    S.keyTries[want] = (S.keyTries[want] || 0) + 1;
+    let ok = ch === want;
+    // capitals and shifted symbols: use the Shift key on the other hand
+    if (ok && info && !S.phone) {
+      const plan = charPlan(want);
+      if (plan && plan.shift) {
+        const wrongHeld = plan.shift === 'ShiftL' ? (info.shiftR && !info.shiftL) : (info.shiftL && !info.shiftR);
+        if (wrongHeld) { ok = false; S.hooks.onShiftHint && S.hooks.onShiftHint(plan.shift); }
+      }
+    }
+    if (ok) {
       S.pos++; S.correct++; S.streak++; S.bestStreak = Math.max(S.bestStreak, S.streak);
       S.ema += 1;
-      S.lastKeyT = S.t;
       if (S.streak === 8) Sound.play('sprint'); else Sound.play('key');
       const boost = sprinting() ? 1.35 : 1;
       if (!S.practice) {
         const type = S.level.type;
-        if (type === 'chase') S.gap = Math.min(100, S.gap + DANGER_RATE / S.targetCps * 1.08 * boost);
+        if (type === 'chase') S.gap = Math.min(100, S.gap + rate() / S.targetCps * 1.08 * boost);
         if (type === 'boulder' || type === 'vine') S.strength = Math.min(100, S.strength + DRAIN / S.targetCps * 1.1 * boost);
         else S.strength = Math.min(100, S.strength + 0.35);
-        if (type === 'falling') S.objs.forEach(o => { if (!o.dodged && !o.landed) { o.got++; if (o.got >= o.need) { o.dodged = true; o.wx = S.cam + playerScreen().x + o.off; S.dashT = S.t; } } });
+        if (type === 'falling') S.objs.forEach(o => { if (!o.dodged && !o.landed) { o.got++; if (o.got >= o.need) { o.dodged = true; o.wx = S.cam + playerScreen().x + o.off; S.dashT = S.t; Sound.play('whoosh'); } } });
       }
+      autoAdvance();
       if (S.pos >= S.text.length) finish(true);
     } else {
       S.errors++; S.streak = 0;
@@ -223,9 +443,10 @@ const Game = (() => {
     }
     S.hooks.onChange(S);
   }
+  function rate() { return S.boss ? DANGER_RATE * 1.2 : DANGER_RATE; }
 
   function spawn(dur) {
-    const fall = dur || Math.max(1.6, 2.6 - S.level.lesson * 0.04);
+    const fall = dur || Math.max(1.6, 2.6 - Math.min(15, S.level.lesson) * 0.04);
     const need = Math.max(2, Math.round(S.targetCps * fall * 0.7));
     S.objs.push({ t: 0, dur: fall, need, got: 0, off: 10 + Math.random() * 30, dodged: false, landed: false, rot: Math.random() * 6, wx: 0, bounce: 0, kind: S.world.faller });
   }
@@ -243,9 +464,10 @@ const Game = (() => {
       if (acc >= 95 && w >= S.level.minWpm) stars = 2;
       if (acc >= 98 && w >= S.level.minWpm * 1.25 && (S.practice || S.strength >= 50)) stars = 3;
     }
-    let coins = win ? stars * 10 + Math.floor(S.correct / 8) : Math.floor(S.correct / 15);
-    if (S.practice) coins = Math.floor(coins / 2);
-    S.result = { win, reachedEnd, died: !reachedEnd, wpm: w, acc, stars, coins, bestStreak: S.bestStreak, correct: S.correct, errors: S.errors, keyErrors: S.keyErrors };
+    let coins = win ? stars * 10 + Math.floor(S.correct / 8) + (S.boss ? 40 : 0) : Math.floor(S.correct / 15);
+    if (S.practice || S.level.smart) coins = Math.floor(coins / 2);
+    S.result = { win, reachedEnd, died: !reachedEnd, wpm: w, acc, stars, coins, bestStreak: S.bestStreak, correct: S.correct,
+      errors: S.errors, keyErrors: S.keyErrors, keyTries: S.keyTries, ref: S.ref, revived: S.revived };
     S.anim = reachedEnd ? 'win' : 'lose'; S.animT = 0;
     Sound.play(win ? 'win' : 'lose');
     const res = S.result, hooks = S.hooks;
@@ -270,16 +492,17 @@ const Game = (() => {
     S.phase += dt * (4 + S.speed / 32);
     if (type === 'vine') S.climb += dt * (2 + cps * 2.5);
     S.climbShown += (S.pos / S.text.length - S.climbShown) * Math.min(1, dt * 5);
+    S.shownGap = S.shownGap == null ? S.gap : S.shownGap + (S.gap - S.shownGap) * Math.min(1, dt * 6);
 
     if (S.startT && !S.over && !S.practice) {
       if (type === 'chase') {
-        S.gap -= DANGER_RATE * dt;
-        if (S.gap <= 0) { hurt(25, 'big'); S.gap = 38; }
+        S.gap -= rate() * dt;
+        if (S.gap <= 0) { S.gap = 38; hurt(25, 'big'); }
       } else if (type === 'boulder' || type === 'vine') {
         S.strength -= DRAIN * dt;
-        if (S.strength <= 0) { S.strength = 0; finish(false); }
+        if (S.strength <= 0) { S.strength = 0; outOfStrength(); }
       } else if (type === 'falling') {
-        const every = Math.max(2.0, 3.4 - S.level.lesson * 0.06);
+        const every = Math.max(2.0, 3.4 - Math.min(15, S.level.lesson) * 0.06);
         if (S.t - S.lastSpawn > every || (!S.objs.some(o => !o.landed) && S.t - S.lastSpawn > 1)) { spawn(); S.lastSpawn = S.t; }
       }
       if (S.t - (S.lastHook || 0) > 0.2) { S.lastHook = S.t; S.hooks.onChange(S); }
@@ -360,11 +583,12 @@ const Game = (() => {
 
     // danger behind (chase)
     if (type === 'chase' && !S.practice) {
-      const gx = P.x - 95 * s - Math.max(0, S.gap) * VW * 0.0035 - (S.anim === 'win' ? S.animT * 200 : 0);
-      if (world.chaser === 'avalanche') Art.drawAvalanche(ctx, gx + 40, ground + 5, VH, S.t);
+      const bs = S.boss ? 1.35 : 1;
+      const gx = P.x - 95 * s * bs - Math.max(0, S.shownGap) * VW * 0.0035 - (S.anim === 'win' ? S.animT * 200 : 0);
+      if (world.chaser === 'avalanche' || world.chaser === 'lava') Art.drawAvalanche(ctx, gx + 40, ground + 5, VH * (S.boss ? 1.25 : 1), S.t, world.chaser === 'lava');
       else if (world.chaser === 'rollingrock') {
-        Art.drawRock(ctx, gx - 10, ground - 70 * s + 2, 70 * s, S.cam / 70);
-      } else Art.drawBeast(ctx, world.chaser, gx - 60 * s, ground + 4, s * 0.95, S.anim === 'win' ? S.t * 3 : S.phase * 0.9 + 1, 1);
+        Art.drawRock(ctx, gx - 10, ground - 70 * s * bs + 2, 70 * s * bs, S.cam / 70);
+      } else Art.drawBeast(ctx, world.chaser, gx - 60 * s * bs, ground + 4, s * 0.95 * bs, S.anim === 'win' ? S.t * 3 : S.phase * 0.9 + 1, 1);
     }
 
     // speed lines when sprinting
@@ -425,8 +649,9 @@ const Game = (() => {
       ctx.fillStyle = '#1e2536';
       for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) if ((i + j) % 2) ctx.fillRect(fx + 4 + i * 10, ground - 110 + j * 13, 10, 13);
     }
-    if (S.anim === 'ready') banner('Type the first key to start!');
-    if (S.practice && S.anim === 'ready') banner('Practice mode — no danger', 40);
+    if (S.t - S.reviveT < 1.2) { ctx.strokeStyle = 'rgba(255,213,79,' + (1 - (S.t - S.reviveT) / 1.2) + ')'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(P.x, P.y - 80 * s, 40 + (S.t - S.reviveT) * 120, 0, Math.PI * 2); ctx.stroke(); }
+    if (S.anim === 'ready') banner(S.boss ? t('bossBanner') : t('typeFirst'));
+    if (S.practice && S.anim === 'ready') banner(t('practiceBanner'), 40);
   }
 
   function drawVine(look, s, mood, dizzy) {
@@ -443,7 +668,7 @@ const Game = (() => {
       ctx.fillStyle = '#ffffff';
       for (let i = 0; i < 6; i++) { Art.circle(ctx, v.vx - 40 + i * 16, v.bottom - 6 - Math.abs(Math.sin(S.t * 8 + i)) * 26, 7); ctx.fill(); }
     }
-    if (S.anim === 'ready') banner('Type the first key to start climbing!');
+    if (S.anim === 'ready') banner(t('typeFirstClimb'));
   }
 
   function drawParts() {
@@ -455,12 +680,12 @@ const Game = (() => {
     ctx.globalAlpha = 1;
   }
   function banner(txt, dy = 0) {
-    ctx.font = 'bold 22px system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.font = '600 22px Fredoka, system-ui, sans-serif'; ctx.textAlign = 'center';
     const w = ctx.measureText(txt).width + 40, x = VW / 2, y = VH * 0.42 + dy;
     ctx.fillStyle = 'rgba(30,37,54,0.82)';
     ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - w / 2, y - 24, w, 38, 19) : ctx.rect(x - w / 2, y - 24, w, 38); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.fillText(txt, x, y + 2);
   }
 
-  return { init, start, stop, key, pause, state, resize, wpm, accuracy, sprinting };
+  return { init, start, stop, key, pause, state, resize, wpm, accuracy, sprinting, revive, giveUp };
 })();
