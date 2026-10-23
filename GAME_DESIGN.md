@@ -1,7 +1,7 @@
 # D' Keys to Escaping — Game Design
 
-This file holds the original project brief so future sessions follow the same plan.
-Stage 1 is built. Stage 2 is listed at the bottom and is **not built yet**.
+This file holds the original project briefs so future sessions follow the same plan.
+**Stage 1 and Stage 2 are both built.** The Stage 2 brief is copied in full at the bottom.
 
 ---
 
@@ -66,7 +66,7 @@ Commit everything to the main branch when done.
 
 ---
 
-## STAGE 2 (do NOT build yet)
+## STAGE 2 — built (original list from the Stage 1 brief)
 
 - Capital letters and Shift
 - Numbers and symbols worlds (laptop only)
@@ -75,8 +75,56 @@ Commit everything to the main branch when done.
 - Wardrobe shop with unlockable hats and accessories
 - Boss levels
 - One revive per level for coins
-- Smart practice of weak keys (per-key error counts are already saved in each profile's `stats.keyErrors`)
+- Smart practice of weak keys
 - Stats page
 - Parent view
 - World certificates
 - Extra polish
+
+## Stage 2 brief (verbatim)
+
+Read GAME_DESIGN.md first and keep everything from Stage 1 working. Now build Stage 2 of "D' Keys to Escaping":
+
+1. CAPITALS AND SHIFT: a world teaching capital letters with the correct Shift hand.
+
+2. NUMBERS AND SYMBOLS (Laptop mode only, never on phones): later, harder worlds for the number row and these symbols: @ ! # $ % ^ & * ( ) : ; ' " ? / > . < , and the rest of the US keyboard. Add each to the Key Guide.
+
+3. SPANISH: each profile can choose English or Spanish for the menus and, separately, English or Spanish for the typing practice.
+   - The keyboards are US layout on Windows. Start the Spanish world with a lesson on adding the "United States-International" keyboard in Windows settings, then teach: ~ then n = ñ, ' then a vowel = á é í ó ú, and how to type ü ¿ ¡. Add these to the Key Guide.
+   - Spanish words and sentences use ñ and accents correctly.
+   - Typing facts are shown in the profile's language.
+
+4. VERSE MODE: an optional mode where the sentence and paragraph levels use Bible verses — King James Version (KJV) for English and Reina-Valera 1909 for Spanish. Both are public domain. Load verse text from a reliable public-domain source file and include it in the repo; do NOT type verses from memory. Every verse must be word-for-word exact, with its reference shown.
+
+5. WARDROBE SHOP: spend coins on clothes and colors. Hats and accessories unlock by reaching higher levels. Modest clothing rule and male/female separation still apply.
+
+6. BOSS LEVELS: a longer, harder chase at the end of each world using every key learned so far.
+
+7. ONE REVIVE per level: spend coins to get back up once when health runs out.
+
+8. SMART PRACTICE: track the keys each player misses most and offer a practice round built from them.
+
+9. STATS PAGE per profile: best speed, accuracy over time, most-missed keys, levels completed.
+
+10. PARENT VIEW: one screen showing every profile's progress and stats side by side.
+
+11. WORLD CERTIFICATES: when a world is finished, show a printable certificate with the player's name, world, speed, and accuracy.
+
+12. POLISH: smoother animations, sound effects, background music (on/off in settings), and test everything on laptop and phone screen sizes.
+
+13. INSTALLABLE APP: make D' Keys to Escaping installable on laptop, tablet, and phone, so the browser shows an Install button.
+   - Add a web app manifest with the name "D' Keys to Escaping", a short name "D' Keys", app icons in the game's flat cartoon style (192px and 512px), and a theme color.
+   - Add a service worker so the game works offline after the first visit.
+   - VERY IMPORTANT — my other games are hosted on the same GitHub Pages site (workmarisa86-svg.github.io/Chess-project/, /Negotiation_Xpert/, /Mighty-Men-o-War-/). An earlier service worker took over another game's address, so:
+     - The manifest "scope" and "start_url" must be ONLY this repository's folder (for example /typing-game/), never the site root "/".
+     - Register the service worker with a relative path and scope limited to this folder only.
+     - Use cache names that start with "dkeys-" and only ever delete caches that start with "dkeys-", so it can never touch another game's cache.
+     - Add a version number so updates show up after a refresh.
+
+Update the README and commit everything to the main branch when done.
+
+## Ideas for a future Stage 3 (not requested yet)
+
+- More Spanish-only worlds and Spanish verse paragraphs for every world
+- A per-key heat map on the stats page
+- Optional parent PIN for the parent view

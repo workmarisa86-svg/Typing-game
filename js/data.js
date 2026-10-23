@@ -12,18 +12,54 @@ const FINGER_COLORS = {
   lp: '#ff8a80', lr: '#ffb74d', lm: '#fff176', li: '#81c784',
   ri: '#4dd0e1', rm: '#fff176', rr: '#ffb74d', rp: '#ff8a80', th: '#cfd8dc'
 };
+// special (non-character) keys are named with more than one letter
 const KEY_ROWS = [
-  [['`','lp'],['1','lp'],['2','lr'],['3','lm'],['4','li'],['5','li'],['6','ri'],['7','ri'],['8','rm'],['9','rr'],['0','rp'],['-','rp'],['=','rp']],
-  [['q','lp'],['w','lr'],['e','lm'],['r','li'],['t','li'],['y','ri'],['u','ri'],['i','rm'],['o','rr'],['p','rp'],['[','rp'],[']','rp']],
-  [['a','lp'],['s','lr'],['d','lm'],['f','li'],['g','li'],['h','ri'],['j','ri'],['k','rm'],['l','rr'],[';','rp'],["'",'rp']],
-  [['z','lp'],['x','lr'],['c','lm'],['v','li'],['b','li'],['n','ri'],['m','ri'],[',','rm'],['.','rr'],['/','rp']],
-  [[' ','th']]
+  [['`','lp'],['1','lp'],['2','lr'],['3','lm'],['4','li'],['5','li'],['6','ri'],['7','ri'],['8','rm'],['9','rr'],['0','rp'],['-','rp'],['=','rp'],['Backspace','rp']],
+  [['Tab','lp'],['q','lp'],['w','lr'],['e','lm'],['r','li'],['t','li'],['y','ri'],['u','ri'],['i','rm'],['o','rr'],['p','rp'],['[','rp'],[']','rp'],['\\','rp']],
+  [['Caps','lp'],['a','lp'],['s','lr'],['d','lm'],['f','li'],['g','li'],['h','ri'],['j','ri'],['k','rm'],['l','rr'],[';','rp'],["'",'rp'],['Enter','rp']],
+  [['ShiftL','lp'],['z','lp'],['x','lr'],['c','lm'],['v','li'],['b','li'],['n','ri'],['m','ri'],[',','rm'],['.','rr'],['/','rp'],['ShiftR','rp']],
+  [[' ','th'],['AltGr','th']]
 ];
+const SPECIAL_LABELS = { Backspace: '⌫', Tab: 'Tab', Caps: 'Caps', Enter: 'Enter', ShiftL: 'Shift', ShiftR: 'Shift', AltGr: 'AltGr' };
+// shifted characters -> the key they live on
+const SHIFT_OF = { '~': '`', '!': '1', '@': '2', '#': '3', '$': '4', '%': '5', '^': '6', '&': '7', '*': '8', '(': '9', ')': '0',
+  '_': '-', '+': '=', '{': '[', '}': ']', '|': '\\', ':': ';', '"': "'", '<': ',', '>': '.', '?': '/' };
+const SHIFTED_LABEL = {};
+Object.entries(SHIFT_OF).forEach(([s, b]) => { SHIFTED_LABEL[b] = s; });
+// Spanish characters on the Windows "United States-International" keyboard: dead key, then a letter
+const INTL_SEQ = {
+  'ñ': ['~', 'n'], 'Ñ': ['~', 'N'],
+  'á': ["'", 'a'], 'é': ["'", 'e'], 'í': ["'", 'i'], 'ó': ["'", 'o'], 'ú': ["'", 'u'],
+  'Á': ["'", 'A'], 'É': ["'", 'E'], 'Í': ["'", 'I'], 'Ó': ["'", 'O'], 'Ú': ["'", 'U'],
+  'ü': ['"', 'u'], 'Ü': ['"', 'U'],
+  '¿': ['AltGr', '/'], '¡': ['AltGr', '1']
+};
 const ROW_NAMES = ['number row', 'top row', 'home row', 'bottom row', 'space bar'];
 const KEY_INFO = {};
 KEY_ROWS.forEach((row, r) => row.forEach(([k, f], c) => { KEY_INFO[k] = { finger: f, row: r, col: c }; }));
 const HOME_KEYS = { lp: 'a', lr: 's', lm: 'd', li: 'f', ri: 'j', rm: 'k', rr: 'l', rp: ';', th: 'space' };
-function keyLabel(k) { return k === ' ' ? 'space' : k.toUpperCase(); }
+// How to type any character: { keys: [physical keys in order, base key last], shift: 'ShiftL'|'ShiftR'|null, dead: first key of a dead-key pair }
+function charPlan(ch) {
+  if (ch === ' ') return { base: ' ', shift: null, pre: null };
+  if (INTL_SEQ[ch]) {
+    const [a, b] = INTL_SEQ[ch];
+    if (a === 'AltGr') return { base: b, shift: null, pre: null, altgr: true };
+    const pre = charPlan(a), main = charPlan(b);
+    return Object.assign({}, main, { pre });
+  }
+  let base = ch, shifted = false;
+  if (/[A-Z]/.test(ch)) { base = ch.toLowerCase(); shifted = true; }
+  else if (SHIFT_OF[ch]) { base = SHIFT_OF[ch]; shifted = true; }
+  const info = KEY_INFO[base];
+  if (!info) return null;
+  const shift = shifted ? (info.finger[0] === 'l' ? 'ShiftR' : 'ShiftL') : null;
+  return { base, shift, pre: null };
+}
+function keyLabel(k) {
+  if (k === ' ') return 'space';
+  if (SPECIAL_LABELS[k]) return SPECIAL_LABELS[k];
+  return k.length === 1 && /[a-z]/.test(k) ? k.toUpperCase() : k;
+}
 
 // ---------- Lessons (Stage 1: lowercase English letters) ----------
 const LESSONS = [
