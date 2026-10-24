@@ -3,6 +3,10 @@
 
 const STRINGS = {
   en: {
+    pianoIntroTap: 'Tap each falling tile when it reaches the gold line. Every correct tap plays the next notes of the piece. Finish a song to unlock the next one.',
+    pianoPlayWith: 'Play with:', pianoKeys: 'Keyboard keys', pianoTap: 'Tap the tiles', pianoTapHow: 'Tap the tiles with your finger or mouse ({0} lanes).',
+    pianoTapToStart: 'Tap the first tile to start the music', showSheet: 'Show sheet music', hideSheet: 'Hide sheet music',
+    sheetNote: 'Simplified sheet music made from the notes you will play (treble and bass staff).',
     pianoBtn: '🎹 Piano Challenge', pianoTitle: 'Piano Challenge', pianoShort: 'Piano', createFirst: 'Create a player first — then the piano is ready!',
     pianoIntro: 'Press the letter on each falling tile when it reaches the gold line. Every correct key plays the next notes of the piece. Finish a song to unlock the next one.',
     pd_beginner: 'Beginner', pd_easy: 'Easy', pd_medium: 'Medium', pd_hard: 'Hard', pd_expert: 'Expert',
@@ -110,6 +114,10 @@ const STRINGS = {
     opt_ponytail: 'Ponytail', opt_long: 'Long hair', opt_bun: 'Bun', opt_braid: 'Braid'
   },
   es: {
+    pianoIntroTap: 'Toca cada ficha cuando llegue a la línea dorada. Cada toque correcto toca las siguientes notas de la obra. Termina una canción para desbloquear la siguiente.',
+    pianoPlayWith: 'Jugar con:', pianoKeys: 'Teclas del teclado', pianoTap: 'Tocar las fichas', pianoTapHow: 'Toca las fichas con el dedo o el ratón ({0} carriles).',
+    pianoTapToStart: 'Toca la primera ficha para empezar la música', showSheet: 'Ver partitura', hideSheet: 'Ocultar partitura',
+    sheetNote: 'Partitura simplificada hecha con las notas que vas a tocar (clave de sol y clave de fa).',
     pianoBtn: '🎹 Desafío de piano', pianoTitle: 'Desafío de piano', pianoShort: 'Piano', createFirst: 'Primero crea un jugador: ¡luego el piano estará listo!',
     pianoIntro: 'Pulsa la letra de cada ficha cuando llegue a la línea dorada. Cada tecla correcta toca las siguientes notas de la obra. Termina una canción para desbloquear la siguiente.',
     pd_beginner: 'Principiante', pd_easy: 'Fácil', pd_medium: 'Intermedio', pd_hard: 'Difícil', pd_expert: 'Experto',

@@ -1,7 +1,7 @@
 /* Screens, menus, map, shop, stats, parent view, certificates, key guide and input wiring */
 'use strict';
 
-const APP_VERSION = '3.0.0';
+const APP_VERSION = '3.1.0';
 
 const UI = (() => {
   const $ = id => document.getElementById(id);
