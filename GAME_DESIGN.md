@@ -188,6 +188,13 @@ SCREEN DESIGN
 
 Update the README, bump the service worker version so players get the update, and commit everything to the main branch when done.
 
+## Piano Challenge feedback (built in v3.1.0)
+
+- Show the sheet music as an option below the song choice (the song's own notes on a treble and bass staff).
+- Add more classical pieces by Handel and Bach (sources and licenses in CREDITS.md).
+- Add a tap mode: tiles fall and you tap them with your fingers (or the mouse), no keyboard letters.
+- Bug: pressing the first key to start a piece started it but took away a life. Fixed.
+
 ## Ideas for a future Stage 3 (not requested yet)
 
 - More Spanish-only worlds and Spanish verse paragraphs for every world

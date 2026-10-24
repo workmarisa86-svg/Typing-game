@@ -429,3 +429,17 @@ button { font-family: inherit; }
   .pp-stats b { font-size: 1.2rem; min-width: 40px; }
   .pp-combo { min-width: 0; font-size: 0.85rem; }
 }
+
+/* Piano: input mode, tap mode and sheet music */
+.pm-modes { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+#scr-piano.tap .pp-keys { display: none; }
+#scr-piano.tap .pp-stage { touch-action: none; cursor: pointer; }
+.sheet-btn { margin-top: 12px; }
+.sheet-box { margin-top: 10px; max-height: 55vh; overflow: auto; border-radius: 12px; }
+.sheet { background: #fffdf6; border-radius: 12px; padding: 8px 6px; }
+.sheet-note { color: #4a5578; font-size: 0.85rem; margin: 2px 8px 4px; }
+.sheet svg { display: block; }
+.sheet .sm { font-family: 'Noto Music', 'Bravura Text', 'Segoe UI Symbol', 'Apple Symbols', 'DejaVu Sans', serif; stroke: none; }
+.sheet .nh { stroke: none; }
+.sheet .nh.hollow { fill: #fffdf6; stroke: #1e2536; stroke-width: 1.6; }
+.sheet .flag { fill: none; stroke-width: 1.6; }

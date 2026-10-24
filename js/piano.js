@@ -99,11 +99,22 @@ const Piano = (() => {
     while (i < list.length - 1 && d.songs[list[i].id] && d.songs[list[i].id].done) i++;
     return i;
   }
+  function isOpen(profile, i) {
+    const d = data(profile).songs, list = songs();
+    return i === 0 || !!(d[list[i - 1].id] && d[list[i - 1].id].done) || !!(d[list[i].id] && d[list[i].id].done);
+  }
   function keysFor(diff, phone) {
     const k = KEYS[diff];
     return phone && k.length > 4 ? PHONE_KEYS : k;
   }
   const diffName = d => t('pd_' + d);
+  // 'keys' = play with letter keys, 'tap' = tap the falling tiles with fingers or the mouse
+  function inputMode() {
+    const p = U.profile(); if (!p) return 'keys';
+    const d = data(p);
+    return d.input || (U.isPhone() ? 'tap' : 'keys');
+  }
+  const tapMode = () => inputMode() === 'tap';
 
   // ---------- song selection ----------
   function openMenu() {
@@ -114,18 +125,23 @@ const Piano = (() => {
     $('pm-coins').textContent = profile.coins;
     const body = $('pm-body'); body.innerHTML = '';
     const phone = U.isPhone();
-    body.append(U.h('p', { class: 'pm-intro' }, t('pianoIntro')));
+    body.append(U.h('p', { class: 'pm-intro' }, tapMode() ? t('pianoIntroTap') : t('pianoIntro')));
+    const modes = U.h('div', { class: 'seg pm-mode' });
+    [['keys', '⌨ ' + t('pianoKeys')], ['tap', '👆 ' + t('pianoTap')]].forEach(([v, label]) => {
+      modes.append(U.h('button', { class: inputMode() === v ? 'on' : '', onclick: () => { data(profile).input = v; Store.save(); Sound.play('click'); openMenu(); } }, label));
+    });
+    body.append(U.h('div', { class: 'pm-modes' }, U.h('b', {}, t('pianoPlayWith')), modes));
     DIFFS.forEach(diff => {
       const group = list.map((s, i) => ({ s, i })).filter(x => x.s.diff === diff);
       if (!group.length) return;
-      const keys = keysFor(diff, phone);
+      const keys = keysFor(diff, phone || tapMode());
       body.append(U.h('div', { class: 'pm-head' },
         U.h('h3', {}, diffName(diff)),
         U.h('div', { class: 'pm-keys' }, keys.map(k => U.h('span', { class: 'pm-key' }, k.toUpperCase())))));
       const grid = U.h('div', { class: 'pm-grid' });
       group.forEach(({ s, i }) => {
         const r = d.songs[s.id] || {};
-        const locked = i > unl;
+        const locked = !isOpen(profile, i);
         const card = U.h('button', { class: 'pm-song' + (locked ? ' locked' : '') + (r.done ? ' done' : '') + (i === unl ? ' next' : '') },
           U.h('b', {}, (locked ? '🔒 ' : '') + (U.lang() === 'es' ? s.titleEs : s.title)),
           U.h('small', {}, s.composer),
@@ -144,17 +160,102 @@ const Piano = (() => {
   }
   function songIntro(i) {
     const s = songs()[i], profile = U.profile();
-    const keys = keysFor(s.diff, U.isPhone());
+    const keys = keysFor(s.diff, U.isPhone() || tapMode());
     const practice = profile.settings.mode === 'practice';
-    U.openModal(
+    const sheetBox = U.h('div', { class: 'sheet-box hidden' });
+    const sheetBtn = U.h('button', { class: 'btn btn-ghost sheet-btn', onclick: () => {
+      if (!sheetBox.firstChild) sheetBox.append(sheetMusic(s));
+      sheetBox.classList.toggle('hidden');
+      sheetBtn.textContent = '🎼 ' + (sheetBox.classList.contains('hidden') ? t('showSheet') : t('hideSheet'));
+    } }, '🎼 ' + t('showSheet'));
+    const box = U.openModal(
       U.h('h2', {}, '🎹 ' + (U.lang() === 'es' ? s.titleEs : s.title)),
       U.h('p', { class: 'center' }, s.composer + ' · ' + diffName(s.diff)),
-      U.h('div', { class: 'intro-keys' }, keys.map(k => U.h('div', { class: 'kcap', style: 'background:#fff' }, k.toUpperCase()))),
+      tapMode() ? U.h('p', { class: 'center' }, '👆 ' + t('pianoTapHow', keys.length)) : U.h('div', { class: 'intro-keys' }, keys.map(k => U.h('div', { class: 'kcap', style: 'background:#fff' }, k.toUpperCase()))),
       U.h('p', { class: 'center small' }, t('pianoHow')),
       U.h('p', { class: 'center' }, U.h('b', {}, practice ? t('pianoPracticeRule') : t('pianoChallengeRule'))),
       U.h('div', { class: 'row-btns' },
         U.h('button', { class: 'btn btn-ghost', onclick: U.closeModal }, t('back')),
-        U.h('button', { class: 'btn btn-gold', onclick: () => { U.closeModal(); start(i); } }, t('start') + ' ▶')));
+        U.h('button', { class: 'btn btn-gold', onclick: () => { U.closeModal(); start(i); } }, t('start') + ' ▶')),
+      U.h('div', { class: 'center' }, sheetBtn),
+      sheetBox);
+    box.classList.add('wide');
+  }
+
+  // ---------- sheet music (simplified score drawn from the song's notes) ----------
+  const SHARP_SP = [[0, 0], [0, 1], [1, 0], [1, 1], [2, 0], [3, 0], [3, 1], [4, 0], [4, 1], [5, 0], [5, 1], [6, 0]];
+  const FLAT_SP = [[0, 0], [1, -1], [1, 0], [2, -1], [2, 0], [3, 0], [4, -1], [4, 0], [5, -1], [5, 0], [6, -1], [6, 0]];
+  function sheetMusic(s) {
+    const ks = s.ks || 0, ts = s.ts || [4, 4], bar = ts[0] * 4 / ts[1], bar0 = s.bar0 || 0;
+    const keyAcc = [0, 0, 0, 0, 0, 0, 0];
+    [3, 0, 4, 1, 5, 2, 6].slice(0, Math.max(0, ks)).forEach(l => { keyAcc[l] = 1; });
+    [6, 2, 5, 1, 4, 0, 3].slice(0, Math.max(0, -ks)).forEach(l => { keyAcc[l] = -1; });
+    const spell = m => { const [l, a] = (ks >= 0 ? SHARP_SP : FLAT_SP)[((m % 12) + 12) % 12]; return { d: (Math.floor(m / 12) - 1) * 7 + l, l, a }; };
+    const gaps = []; for (let k = 1; k < s.ev.length; k++) { const g = s.ev[k][0] - s.ev[k - 1][0]; if (g > 0) gaps.push(g); }
+    gaps.sort((a, b) => a - b);
+    const med = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 1;
+    const W = 760, x0 = 58 + Math.abs(ks) * 9 + 22;
+    let ppb = Math.max(20, Math.min(64, 22 / med));
+    let mw = bar * ppb + 14;
+    if (mw > W - x0 - 10) { ppb = (W - x0 - 24) / bar; mw = bar * ppb + 14; }
+    const perSys = Math.max(1, Math.floor((W - x0 - 10) / mw));
+    const lastM = Math.floor((s.ev[s.ev.length - 1][0] + bar0) / bar);
+    const systems = Math.ceil((lastM + 1) / perSys), SH = 190;
+    const out = [];
+    const sym = (x, y, ch, size, anchor) => out.push(`<text x="${x}" y="${y}" font-size="${size}" text-anchor="${anchor || 'middle'}" class="sm">${ch}</text>`);
+    const line = (x1, y1, x2, y2, w) => out.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke-width="${w || 1.2}"/>`);
+    for (let sy = 0; sy < systems; sy++) {
+      const top = 26 + sy * SH, tT = top + 10, bT = top + 90;   // treble & bass top lines
+      for (let k = 0; k < 5; k++) { line(10, tT + k * 8, W - 10, tT + k * 8); line(10, bT + k * 8, W - 10, bT + k * 8); }
+      line(10, tT, 10, bT + 32, 1.6); line(W - 10, tT, W - 10, bT + 32, 1.4);
+      sym(26, tT + 30, '𝄞', 40); sym(25, bT + 25, '𝄢', 30);
+      // key signature
+      const tPos = { 1: [38, 35, 39, 36, 33, 37, 34], '-1': [34, 37, 33, 36, 32, 35, 31] };
+      const bPos = { 1: [24, 21, 25, 22, 19, 23, 20], '-1': [20, 23, 19, 22, 18, 21, 17] };
+      for (let k = 0; k < Math.abs(ks); k++) {
+        const g = ks > 0 ? '♯' : '♭', sg = ks > 0 ? 1 : -1;
+        sym(48 + k * 9, tT + (38 - tPos[sg][k]) * 4 + 4, g, 15); sym(48 + k * 9, bT + (26 - bPos[sg][k]) * 4 + 4, g, 15);
+      }
+      if (sy === 0) { [tT, bT].forEach(y => { sym(x0 - 12, y + 14, ts[0], 17); sym(x0 - 12, y + 30, ts[1], 17); }); }
+      for (let m = 1; m <= perSys; m++) { const x = x0 + m * mw - 4; if (sy * perSys + m <= lastM + 1) line(x, tT, x, bT + 32, 1.2); }
+      sym(12, top + 4, sy * perSys + 1, 10, 'start');
+    }
+    const shown = {};
+    s.ev.forEach(e => {
+      const pos = e[0] + bar0, m = Math.floor(pos / bar), sy = Math.floor(m / perSys);
+      const x = x0 + (m - sy * perSys) * mw + (pos - m * bar) * ppb + 8;
+      const top = 26 + sy * SH, tT = top + 10, bT = top + 90;
+      const q = [4, 3, 2, 1.5, 1, 0.75, 0.5, 0.25, 0.125].reduce((a, b) => Math.abs(b - e[1]) < Math.abs(a - e[1]) ? b : a);
+      const hollow = q >= 2, dotted = q === 3 || q === 1.5 || q === 0.75, flags = q <= 0.125 ? 3 : q <= 0.25 ? 2 : q <= 0.75 ? 1 : 0;
+      const groups = { t: [], b: [] };
+      [...new Set(e.slice(2))].forEach(p => groups[p >= 60 ? 't' : 'b'].push(p));
+      ['t', 'b'].forEach(st => {
+        const ps = groups[st]; if (!ps.length) return;
+        const T = st === 't' ? tT : bT, topD = st === 't' ? 38 : 26, botD = topD - 8, mid = topD - 4;
+        const ys = [];
+        ps.forEach(p => {
+          const sp = spell(p), y = T + (topD - sp.d) * 4;
+          ys.push(y);
+          for (let L = botD - 2; L >= sp.d; L -= 2) if (L % 2 === botD % 2) line(x - 7, T + (topD - L) * 4, x + 7, T + (topD - L) * 4);
+          for (let L = topD + 2; L <= sp.d; L += 2) line(x - 7, T + (topD - L) * 4, x + 7, T + (topD - L) * 4);
+          const key = m + ':' + sp.d, want = sp.a;
+          const cur = key in shown ? shown[key] : keyAcc[sp.l];
+          if (want !== cur) { sym(x - 11, y + 4, want === 1 ? '♯' : want === -1 ? '♭' : '♮', 13); shown[key] = want; }
+          out.push(`<ellipse cx="${x}" cy="${y}" rx="5" ry="3.8" transform="rotate(-20 ${x} ${y})" class="${hollow ? 'nh hollow' : 'nh'}"/>`);
+          if (dotted) out.push(`<circle cx="${x + 9}" cy="${y - 1}" r="1.6" class="nh"/>`);
+        });
+        if (q < 4) {
+          const up = (Math.min(...ys) + Math.max(...ys)) / 2 > T + (topD - mid) * 4;
+          const sx = up ? x + 4.6 : x - 4.6, y1 = up ? Math.max(...ys) : Math.min(...ys), y2 = up ? Math.min(...ys) - 28 : Math.max(...ys) + 28;
+          line(sx, y1, sx, y2, 1.3);
+          for (let f = 0; f < flags; f++) { const fy = y2 + (up ? 1 : -1) * f * 6; out.push(`<path d="M${sx} ${fy} q 8 ${up ? 6 : -6} 6 ${up ? 14 : -14}" class="flag"/>`); }
+        }
+      });
+    });
+    const H = systems * SH + 20;
+    const wrap = U.h('div', { class: 'sheet' });
+    wrap.innerHTML = `<p class="sheet-note">${t('sheetNote')}</p><svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${t('showSheet')}"><g stroke="#1e2536" fill="#1e2536">${out.join('')}</g></svg>`;
+    return wrap;
   }
 
   // ---------- columns follow the melody's shape ----------
@@ -181,7 +282,8 @@ const Piano = (() => {
     const profile = U.profile();
     const s = songs()[i];
     const phone = U.isPhone();
-    const keys = keysFor(s.diff, phone);
+    const tap = tapMode();
+    const keys = keysFor(s.diff, phone || tap);
     const gaps = [];
     for (let k = 1; k < s.ev.length; k++) { const g = s.ev[k][0] - s.ev[k - 1][0]; if (g > 0) gaps.push(g); }
     gaps.sort((a, b) => a - b);
@@ -191,8 +293,9 @@ const Piano = (() => {
       practice: profile.settings.mode === 'practice', phone,
       beat: -2, next: 0, hits: 0, misses: 0, wrongs: 0, combo: 0, bestCombo: 0, score: 0,
       started: false, over: false, paused: false, flashes: [], pops: [], pressed: {},
-      medGap, t: 0, loaded: false, perfect: 0
+      medGap, t: 0, loaded: false, perfect: 0, tap
     };
+    document.getElementById('scr-piano').classList.toggle('tap', tap);
     document.body.classList.toggle('phone', phone);
     U.show('scr-piano'); U.applyStatic();
     $('pp-title').textContent = (U.lang() === 'es' ? s.titleEs : s.title);
@@ -203,7 +306,7 @@ const Piano = (() => {
     s.ev.forEach(e => e.slice(2).forEach(p => pitches.add(p)));
     $('pp-loading').classList.remove('hidden');
     PianoAudio.preload(pitches).then(() => { if (P && P.song === s) { P.loaded = true; $('pp-loading').classList.add('hidden'); } });
-    if (phone) focusInput();
+    if (phone && !tap) focusInput();
     resize();
     cancelAnimationFrame(raf);
     let last = performance.now();
@@ -248,19 +351,24 @@ const Piano = (() => {
     hud();
     if (!P.practice && P.misses + P.wrongs >= 3) finish(false);
   }
-  function key(ch) {
+  function key(ch, tapCol) {
     if (!P || P.over || P.paused) return;
-    ch = ch.toLowerCase();
-    const col = P.keys.indexOf(ch);
+    ch = (ch || '').toLowerCase();
+    const col = tapCol != null ? tapCol : P.keys.indexOf(ch);
     if (col < 0 && !/^[a-z;]$/.test(ch)) return;
     PianoAudio.ctx();
-    if (!P.started) { P.started = true; P.beat = P.song.ev[0][0] - 1.5; }
+    if (!P.started) {
+      // the first correct key starts the music on the first tile (it never costs a life)
+      if (col !== P.cols[0]) return;
+      P.started = true; P.beat = P.song.ev[0][0];
+    }
     if (col >= 0) { P.pressed[col] = 0.15; pressKeyRow(col); }
     const ev = P.song.ev, i = P.next;
     if (i >= ev.length) return;
     const e = ev[i];
     const early = (e[0] - P.beat) * secPerBeat();
-    if (col === P.cols[i] && early < 1.4) {
+    if (col === P.cols[i] && early >= 1.4) return;   // right key, just a little early: no penalty
+    if (col === P.cols[i]) {
       // correct key: play the next note or chord of the piece
       PianoAudio.chord(e.slice(2), e[1] * secPerBeat());
       const err = Math.abs(early);
@@ -341,7 +449,8 @@ const Piano = (() => {
     g.addColorStop(0, '#0d1226'); g.addColorStop(1, '#1b2340');
     cx.fillStyle = g; cx.fillRect(0, 0, W, H);
     const n = P.keys.length;
-    const laneW = Math.min(W / n, 150 * d), x0 = (W - laneW * n) / 2;
+    const laneW = Math.min(W / n, (P.tap ? 190 : 150) * d), x0 = (W - laneW * n) / 2;
+    P.lane = { x0: x0 / d, w: laneW / d };
     const hitY = H - 34 * d;
     const tileH = Math.max(46 * d, Math.min(H * 0.16, 110 * d));
     const pxPerBeat = Math.max(tileH * 1.25 / Math.max(P.medGap, 0.0625), H * 0.12);
@@ -378,7 +487,7 @@ const Piano = (() => {
       cx.lineWidth = 3 * d; cx.strokeStyle = isNext ? '#29b6f6' : '#1e2536'; cx.stroke();
       if (ev[i].length > 3) { cx.fillStyle = 'rgba(41,182,246,0.35)'; rr(x + 6 * d, y - 14 * d, w - 12 * d, 6 * d, 3 * d); cx.fill(); }
       cx.fillStyle = '#1e2536'; cx.font = font; cx.textAlign = 'center'; cx.textBaseline = 'middle';
-      cx.fillText(P.keys[c].toUpperCase(), x + w / 2, y - tileH / 2 - 2 * d);
+      cx.fillText(P.tap ? '♪' : P.keys[c].toUpperCase(), x + w / 2, y - tileH / 2 - 2 * d);
     }
     // hit pops & red flashes
     P.pops.forEach(p => {
@@ -397,7 +506,7 @@ const Piano = (() => {
       cx.fillStyle = 'rgba(30,37,54,0.85)'; const bw = Math.min(W - 20 * d, 420 * d);
       rr(W / 2 - bw / 2, H * 0.36, bw, 54 * d, 27 * d); cx.fill();
       cx.fillStyle = '#fff'; cx.font = `600 ${Math.round(19 * d)}px Fredoka, system-ui, sans-serif`; cx.textAlign = 'center'; cx.textBaseline = 'middle';
-      cx.fillText(P.loaded ? t('pianoPressToStart', P.keys[P.cols[0]].toUpperCase()) : t('loadingPiano'), W / 2, H * 0.36 + 27 * d);
+      cx.fillText(P.loaded ? (P.tap ? t('pianoTapToStart') : t('pianoPressToStart', P.keys[P.cols[0]].toUpperCase())) : t('loadingPiano'), W / 2, H * 0.36 + 27 * d);
     }
   }
   function buildKeyRow() {
@@ -426,7 +535,7 @@ const Piano = (() => {
       U.h('div', { class: 'row-btns', style: 'justify-content:center' },
         U.h('button', { class: 'btn btn-ghost', onclick: () => { U.closeModal(); stop(); openMenu(); } }, t('songs')),
         U.h('button', { class: 'btn btn-ghost', onclick: () => { U.closeModal(); start(P.index); } }, t('restart')),
-        U.h('button', { class: 'btn btn-gold', onclick: () => { U.closeModal(); P.paused = false; if (P.phone) focusInput(); } }, t('resume') + ' ▶')));
+        U.h('button', { class: 'btn btn-gold', onclick: () => { U.closeModal(); P.paused = false; if (P.phone && !P.tap) focusInput(); } }, t('resume') + ' ▶')));
   }
 
   function init(helpers) {
@@ -441,10 +550,21 @@ const Piano = (() => {
     });
     const inp = $('piano-input');
     inp.addEventListener('input', () => { const v = inp.value; inp.value = ''; if ($('modal').classList.contains('hidden')) for (const ch of v) key(ch); });
-    $('pp-stage').addEventListener('pointerdown', e => { if (P && P.phone && !e.target.closest('button')) focusInput(); });
+    $('pp-stage').addEventListener('pointerdown', e => {
+      if (!P || e.target.closest('button')) return;
+      if (P.tap) {
+        e.preventDefault();
+        if (!$('modal').classList.contains('hidden') || !P.lane) return;
+        const r = canvas.getBoundingClientRect();
+        const c = Math.floor((e.clientX - r.left - P.lane.x0) / P.lane.w);
+        if (c >= 0 && c < P.keys.length) key('', c);
+        return;
+      }
+      if (P.phone) focusInput();
+    });
     $('btn-pp-pause').addEventListener('click', pause);
     $('btn-pm-back').addEventListener('click', () => U.back());
     window.addEventListener('resize', () => { if (U.screen() === 'scr-piano') resize(); });
   }
-  return { init, openMenu, stop, resize, data, unlockedIdx, songs, state: () => P };
+  return { init, openMenu, stop, resize, data, unlockedIdx, songs, sheetMusic, state: () => P };
 })();

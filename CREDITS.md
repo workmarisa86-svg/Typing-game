@@ -80,10 +80,24 @@ are kept in `music/sources/`.
 | Toccata and Fugue in D minor, BWV 565 | traditionally credited to J. S. Bach | toccata.mid | Mutopia `BachJS/BWV565/ToccataFugue` (Mutopia-2011/09/11-1780) | Public Domain |
 | Passacaglia in G minor, HWV 432 | Handel | passacaglia.mid | cellist `Vl, Vl, Vlc, Vlc/…/Passacaille HWV 432` | see cellist note |
 | Sonata K. 545, 1st mvt (complete) | W. A. Mozart | k545_1.mid | Mutopia `MozartWA/KV545/K545-1` | CC BY-SA 3.0 |
+| Minuet in G, BWV Anh. 114 | Notebook for Anna Magdalena Bach (attributed to Bach; now credited to Christian Petzold) | minuet_g.mid | Mutopia `BachJS/BWVAnh114/anna-magdalena-04` (Mutopia-2017/01/19-75) | Public Domain |
+| Minuet in G minor, BWV Anh. 115 | same notebook (attributed to Bach; now credited to Petzold) | minuet_gm.mid | Mutopia `BachJS/BWVAnh115/anna-magdalena-05` (Mutopia-2015/08/21-76) | Public Domain |
+| Lascia ch'io pianga (Rinaldo) | Handel | Lascia_chio_pianga.mxl | music21 corpus `handel/rinaldo/Lascia_chio_pianga.mxl` (choir setting; the top voice carries the aria melody) | Public Domain |
+| Air from Water Music, HWV 348 | Handel | air_in_f.mid | cellist `Vl, Vl, Vlc, Vlc/…/Air in F` | see cellist note |
+| Menuet in D (Aylesford Pieces) | Handel | aylesford_menuet.mid | Mutopia `HandelGF/Aylesford/12-menuet` (Mutopia-2013/02/21-161) | Public Domain |
+| Musette in D, BWV Anh. 126 | Notebook for Anna Magdalena Bach (attributed to Bach) | musette.mid | Mutopia `BachJS/BWVAnh126/anna-magdalena-22` (Mutopia-2013/01/06-79) | Public Domain |
+| Gavotte in G, HWV 491 | Handel | gavotte_hwv491.mid | Mutopia `HandelGF/Aylesford/03-gavotte` (Mutopia-2013/02/21-151) | Public Domain |
+| Air in B-flat (Aylesford Pieces) | Handel | aylesford_air.mid | Mutopia `HandelGF/Aylesford/13-air` (Mutopia-2013/02/21-162) | Public Domain |
+| Passepied (Aylesford Pieces) | Handel | passepied.mid | Mutopia `HandelGF/Aylesford/18-passepied` (Mutopia-2013/02/21-167) | Public Domain |
+| La Réjouissance, HWV 351 | Handel | rejouissance.mid | Mutopia `HandelGF/BWV351/LaRej` (Mutopia-2017/11/24-1864) | Public Domain |
+| Bourrée (Royal Fireworks), HWV 351 | Handel | fireworks_bourree.mid | cellist `Fl, Vl, Vlc/…/Bourree` | see cellist note |
+| Cello Suite No. 1: Prelude, BWV 1007 | J. S. Bach | bwv1007_prelude.mid | Mutopia `BachJS/BWV1007/bwv1007` (Mutopia-2018/01/19-517) | Public Domain |
+| Sleepers, Wake! Chorale Prelude, BWV 645 | J. S. Bach | bwv645.mid | Mutopia `BachJS/BWV645/bwv645` (Mutopia-2006/06/29-601) | CC BY-SA 2.5 |
+| Fugue in C minor, BWV 847 | J. S. Bach | fugue847.mid | Mutopia `BachJS/BWV847/fuga2` (Mutopia-2014/03/02-1941) | CC BY-SA 4.0 |
 
 ### What the build script changes
 - **Key**: four cellist arrangements were written in other keys, so they are moved back to the
-  piece's usual key. The Sarabande goes up 4 semitones to D minor, Alla Hornpipe down 3 to D major,
+  piece's usual key, using each file's key signature. The Sarabande (written in G minor) goes down 5 semitones to D minor, Alla Hornpipe down 3 to D major,
   See the Conquering Hero up 2 to G major, and The Harmonious Blacksmith down 1 to E major.
 - **Length**: Easy songs are cut to at most 140 tiles, Medium 170, Hard 260 (Rondo 400) and Expert
   420–600. The full K. 545 1st movement is kept whole. Long rests are shortened to 2 beats.
@@ -92,6 +106,11 @@ are kept in `music/sources/`.
 - **Chords**: on Beginner to Medium, tiles follow the melody, and each tile also plays any other
   notes that start with it. Accompaniment notes that fall between melody notes are left out. Hard and
   Expert play every note.
+
+### Sheet music
+The 🎼 sheet music under each song is drawn by the game from the same notes the song plays
+(`js/piano.js`, `sheetMusic`), together with the time and key signature read from the source file. It is a
+simplified score: no beams or rests, and on harder levels each chord uses the top note's length.
 
 ## Verses
 
