@@ -238,6 +238,9 @@ matches its source text exactly. See `data/sources/SOURCE.md`. To rebuild, run
     you go: Beginner and Easy use D F J K, Medium S D F J K L, and Hard and Expert A S D F J K L ;.
     In Challenge you have 3 lives. Practice (from Settings) waits for the right key and has no
     game over. Only Play mode follows the music-tiles rules (4 lanes, one mistake).
+- **Simple scores**: like music tiles, every tile you play is worth **1 point** (no combo
+  multipliers), so a score of 1000 is a real achievement and easy to remember. Old best scores
+  from earlier versions, which used the much bigger point system, are not shown any more.
 - **No more overlapping tiles**: each tile is exactly as tall as the time until the next note, so
   tiles never sit on top of each other.
 - **Background music pauses** while a piece is playing and comes back after.

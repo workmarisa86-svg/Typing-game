@@ -146,7 +146,7 @@ const Piano = (() => {
       U.h('span', { class: 'pm-text' }, U.h('b', {}, title(s)), U.h('small', {}, s.composer)),
       U.h('span', { class: 'pm-right' },
         U.h('span', { class: 'pm-stars' }, '★'.repeat(stars) + '☆'.repeat(3 - stars) + (crowns ? ' 👑' + crowns : '')),
-        r.best ? U.h('small', { class: 'pm-best' }, t('bestScore') + ' ' + r.best) : ''));
+        r.top ? U.h('small', { class: 'pm-best' }, t('bestScore') + ' ' + r.top) : ''));
     card.addEventListener('click', onclick);
     return card;
   }
@@ -427,7 +427,7 @@ const Piano = (() => {
       const err = Math.abs(early);
       const q = err < 0.09 ? 1 : err < 0.2 ? 0.8 : 0.6;
       P.hits++; P.combo++; P.bestCombo = Math.max(P.bestCombo, P.combo);
-      P.score += Math.round(100 * q * (1 + Math.min(P.combo, 100) / 50));
+      P.score += 1;   // like music tiles: one point per tile, so scores stay small and easy to remember
       P.pops.push({ col, t: 0.4, q });
       // the music keeps its own steady speed: hitting early never pulls the tiles faster
       advance();
@@ -458,9 +458,9 @@ const Piano = (() => {
     if (P.practice) coins = Math.floor(coins / 2);
     const r = md.songs[s.id] || { stars: 0, best: 0, bestAcc: 0, plays: 0, done: false };
     const firstDone = done && !r.done;
-    r.plays++; r.stars = Math.max(r.stars || 0, stars); r.best = Math.max(r.best || 0, P.score); r.bestAcc = Math.max(r.bestAcc || 0, Math.round(acc));
+    r.plays++; r.stars = Math.max(r.stars || 0, stars); r.top = Math.max(r.top || 0, P.score);   // 'top' replaces the old, much bigger 'best' scores r.bestAcc = Math.max(r.bestAcc || 0, Math.round(acc));
     if (done) r.done = true;
-    md.songs[s.id] = r; all.plays++; all.notes += P.hits; all.best = Math.max(all.best, P.score);
+    md.songs[s.id] = r; all.plays++; all.notes += P.hits; all.top = Math.max(all.top || 0, P.score);
     profile.coins += coins;
     Store.save();
     Sound.play(done ? 'win' : 'lose');
