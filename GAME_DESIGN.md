@@ -203,7 +203,10 @@ Update the README, bump the service worker version so players get the update, an
   - songs are listed top to bottom in levels of three, unlocked with stars
   - the first tile waits at the bottom and starts the music
   - tiles fall at a steady speed, and tapping fast never speeds them up
-  - a song repeats faster each time it is completed and only ends after 3 mistakes
+  - a song repeats 15% faster each time it is completed and ends after one mistake
+  - regular tiles are all one big size; long notes are hold tiles that fill up and give extra points
+  - two tiles in a row never share a lane
+  - each completed round gets a clapping break (applause and confetti), then the next round waits for START
   - the background is our own creative design (not copied)
 - Tiles never overlap. Background music pauses while a piece plays. The composer appears under the title in the song list, not while playing. The song lists are more colorful.
 - All 15 Bach two-part Inventions are included (same public-domain source rules).

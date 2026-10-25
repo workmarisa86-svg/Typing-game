@@ -243,6 +243,18 @@ matches its source text exactly. See `data/sources/SOURCE.md`. To rebuild, run
   song. You can tap a tile as soon as it appears on screen, without waiting for it to reach the
   line. Tiles always fall at a quick, steady speed (at least about 0.6 screen heights per second,
   15% faster each round), even in slow pieces.
+- **Music-tiles rows and rounds (v3.2.2)**, Play mode only:
+  - Every regular tile is the same big, easy-to-tap size (about a quarter of the screen tall).
+  - Long notes (about twice the usual gap or longer) become **tall hold tiles** (2–4 rows) with a
+    guide line and a dot. Tap and keep holding: the tile **fills up** from the bottom and you get
+    **+1 point for every row it fills**. Letting go early keeps the points already earned.
+  - Two tiles in a row **never share a lane**; the next tile moves one lane in the melody's
+    direction. This includes the last tile of a round and the first tile of the next round.
+  - After each completed round there is a **clapping break**: applause, blue and white confetti,
+    👏, the stars earned and "Faster!". The screen then clears. The next round's first tile waits at
+    the bottom with **START**, and "Round N · faster" is shown above it. Nothing moves until you tap
+    it, so rounds never mix. Taps during the break do nothing.
+  - Tiles you have already played are safe to touch; only empty space ends the song.
 - **Simple scores**: like music tiles, every tile you play is worth **1 point** (no combo
   multipliers), so a score of 1000 is a real achievement and easy to remember. Old best scores
   from earlier versions, which used the much bigger point system, are not shown any more.
