@@ -231,11 +231,12 @@ matches its source text exactly. See `data/sources/SOURCE.md`. To rebuild, run
     - Tiles fall at a steady speed. Tapping faster never speeds them up, so the rhythm stays
       right.
     - When you finish the song it plays again **15% faster**. Every finished round gives a star
-      (★, ★★, ★★★, then 👑 crowns), and the song only ends after 3 mistakes (wrong taps or missed
-      tiles).
+      (★, ★★, ★★★, then 👑 crowns). **One mistake** (a wrong tap or a missed tile) ends the song,
+      like music tiles.
     - It always uses 4 lanes.
-  - **⌨ Learn mode (keyboard)** keeps the letter keys, ordered by difficulty (F J up to A S D F J
-    K L ;). It still has the Challenge and Practice rules from Settings.
+  - **⌨ Learn mode (keyboard)** keeps the letter keys, ordered by difficulty. It never uses more
+    than 4 lanes: Beginner uses F J, and every other difficulty uses D F J K. It still has the
+    Challenge (3 mistakes) and Practice rules from Settings.
 - **No more overlapping tiles**: each tile is exactly as tall as the time until the next note, so
   tiles never sit on top of each other.
 - **Background music pauses** while a piece is playing and comes back after.

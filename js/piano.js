@@ -83,8 +83,8 @@ const PianoAudio = (() => {
 const Piano = (() => {
   const $ = id => document.getElementById(id);
   const DIFFS = ['beginner', 'easy', 'medium', 'hard', 'expert'];
-  const KEYS = { beginner: ['f', 'j'], easy: ['d', 'f', 'j', 'k'], medium: ['s', 'd', 'f', 'j', 'k', 'l'],
-    hard: ['a', 's', 'd', 'f', 'j', 'k', 'l', ';'], expert: ['a', 's', 'd', 'f', 'j', 'k', 'l', ';'] };
+  const KEYS = { beginner: ['f', 'j'], easy: ['d', 'f', 'j', 'k'], medium: ['d', 'f', 'j', 'k'],
+    hard: ['d', 'f', 'j', 'k'], expert: ['d', 'f', 'j', 'k'] };   // never more than four lanes
   const PHONE_KEYS = ['d', 'f', 'j', 'k'];
   const PLAY_LANES = 4;
   const PER_LEVEL = 3;          // Play mode: three songs per level
@@ -371,6 +371,7 @@ const Piano = (() => {
     const prog = P.next / nTiles();
     return P.practice ? 0.85 + 0.2 * prog : 1 + 0.25 * prog;
   }
+  const lives = () => P.play ? 1 : 3;   // Play mode: one mistake ends the song, like music tiles
   const secPerBeat = () => 60 / (P.song.bpm * speedMul());
 
   function update(dt) {
@@ -390,7 +391,7 @@ const Piano = (() => {
       P.misses++; P.combo = 0; PianoAudio.wrong();
       advance();
       hud();
-      if (P.misses + P.wrongs >= 3) finish();
+      if (P.misses + P.wrongs >= lives()) finish();
     }
   }
   function advance() {
@@ -436,7 +437,7 @@ const Piano = (() => {
       PianoAudio.wrong();
       P.flashes.push({ col: col >= 0 ? col : tileCol(k), t: 0.45 });
       hud();
-      if (!P.practice && P.misses + P.wrongs >= 3) finish();
+      if (!P.practice && P.misses + P.wrongs >= lives()) finish();
     }
   }
   function accuracy() { const n = P.hits + P.misses + P.wrongs; return n ? P.hits / n * 100 : 100; }
@@ -599,8 +600,8 @@ const Piano = (() => {
     if (!P) return;
     $('pp-score').textContent = P.score;
     $('pp-combo').textContent = P.combo > 1 ? 'x' + P.combo : '';
-    const lost = Math.min(3, P.misses + P.wrongs);
-    $('pp-lives').textContent = P.practice ? t('practice') : '♥'.repeat(3 - lost) + '♡'.repeat(lost);
+    const L = lives(), lost = Math.min(L, P.misses + P.wrongs);
+    $('pp-lives').textContent = P.practice ? t('practice') : '♥'.repeat(L - lost) + '♡'.repeat(lost);
     $('pp-progress').style.width = ((P.next % nTiles()) / nTiles() * 100) + '%';
     $('pp-laps').textContent = P.play ? '★'.repeat(Math.min(3, P.lap)) + '☆'.repeat(Math.max(0, 3 - P.lap)) + (P.lap > 3 ? ' 👑' + (P.lap - 3) : '') : '';
     const nk = tileCol(P.next);
