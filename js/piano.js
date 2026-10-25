@@ -83,8 +83,8 @@ const PianoAudio = (() => {
 const Piano = (() => {
   const $ = id => document.getElementById(id);
   const DIFFS = ['beginner', 'easy', 'medium', 'hard', 'expert'];
-  const KEYS = { beginner: ['d', 'f', 'j', 'k'], easy: ['d', 'f', 'j', 'k'], medium: ['d', 'f', 'j', 'k'],
-    hard: ['d', 'f', 'j', 'k'], expert: ['d', 'f', 'j', 'k'] };   // never more than four lanes
+  const KEYS = { beginner: ['d', 'f', 'j', 'k'], easy: ['d', 'f', 'j', 'k'], medium: ['s', 'd', 'f', 'j', 'k', 'l'],
+    hard: ['a', 's', 'd', 'f', 'j', 'k', 'l', ';'], expert: ['a', 's', 'd', 'f', 'j', 'k', 'l', ';'] };   // Learn mode lanes (Play mode always uses 4)
   const PHONE_KEYS = ['d', 'f', 'j', 'k'];
   const PLAY_LANES = 4;
   const PER_LEVEL = 3;          // Play mode: three songs per level
@@ -371,7 +371,7 @@ const Piano = (() => {
     const prog = P.next / nTiles();
     return P.practice ? 0.85 + 0.2 * prog : 1 + 0.25 * prog;
   }
-  const lives = () => 1;   // one mistake ends the song in both modes, like music tiles
+  const lives = () => P.play ? 1 : 3;   // Play mode: one mistake ends the song (music tiles); Learn mode: three lives
   const secPerBeat = () => 60 / (P.song.bpm * speedMul());
 
   function update(dt) {

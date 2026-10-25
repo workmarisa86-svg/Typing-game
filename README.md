@@ -234,9 +234,10 @@ matches its source text exactly. See `data/sources/SOURCE.md`. To rebuild, run
       (★, ★★, ★★★, then 👑 crowns). **One mistake** (a wrong tap or a missed tile) ends the song,
       like music tiles.
     - It always uses 4 lanes.
-  - **⌨ Learn mode (keyboard)** keeps the letter keys, ordered by difficulty. It never uses more
-    than 4 lanes: every difficulty uses D F J K. In Challenge one mistake ends the song, like Play
-    mode. Practice (from Settings) waits for the right key and has no game over.
+  - **⌨ Learn mode (keyboard)** keeps the letter keys, ordered by difficulty, with more lanes as
+    you go: Beginner and Easy use D F J K, Medium S D F J K L, and Hard and Expert A S D F J K L ;.
+    In Challenge you have 3 lives. Practice (from Settings) waits for the right key and has no
+    game over. Only Play mode follows the music-tiles rules (4 lanes, one mistake).
 - **No more overlapping tiles**: each tile is exactly as tall as the time until the next note, so
   tiles never sit on top of each other.
 - **Background music pauses** while a piece is playing and comes back after.
