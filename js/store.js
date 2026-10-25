@@ -64,7 +64,7 @@ const Store = (() => {
 })();
 
 const Sound = (() => {
-  let ac = null, musicTimer = null, musicOn = false, soundOn = true, step = 0, volume = 0.8;
+  let ac = null, musicTimer = null, musicOn = false, soundOn = true, step = 0, volume = 0.8, paused = false;
   function ctx() {
     if (!ac) {
       const AC = window.AudioContext || window.webkitAudioContext;
@@ -117,9 +117,10 @@ const Sound = (() => {
     play(name) { if (soundOn && fx[name]) try { fx[name](); } catch (e) {} },
     setSound(v) { soundOn = v; },
     setVolume(v) { volume = Math.max(0.001, v); },
+    pauseMusic(v) { paused = v; },
     setMusic(v) {
       musicOn = v;
-      if (v && !musicTimer) musicTimer = setInterval(() => { if (musicOn && ac) tick(); }, 190);
+      if (v && !musicTimer) musicTimer = setInterval(() => { if (musicOn && !paused && ac) tick(); }, 190);
       if (!v && musicTimer) { clearInterval(musicTimer); musicTimer = null; }
     },
     unlock() { ctx(); }
