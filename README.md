@@ -255,6 +255,19 @@ matches its source text exactly. See `data/sources/SOURCE.md`. To rebuild, run
     the bottom with **START**, and "Round N · faster" is shown above it. Nothing moves until you tap
     it, so rounds never mix. Taps during the break do nothing.
   - Tiles you have already played are safe to touch; only empty space ends the song.
+- **Stars like Music Tiles / Magic Tiles (v3.2.3)**, Play mode:
+  - The song's points (1 per tile, plus 1 per filled row of a hold tile) are split into **three
+    equal parts**. Reaching ⅓ of them gives ★, ⅔ gives ★★ and finishing the song gives ★★★. This
+    is how those games do it: a star marker at each third of the progress bar, not choruses.
+  - After the third star the song **carries straight on, 15% faster**, with no break or START.
+    Each extra round gives a 👑. One mistake still ends the song.
+  - The break between rounds is now just short text (and confetti) over the moving tiles. The
+    clapping sound is gone.
+  - Songs play at **their own tempo**: a note of the song's most common length is one tile row.
+    This is kept between 1.4 and 6 rows a second, so very slow pieces still move and the fastest
+    expert pieces stay playable.
+  - Long presses on the tiles no longer open the copy/paste menu (text selection and the
+    long-press menu are switched off on the piano screen).
 - **Simple scores**: like music tiles, every tile you play is worth **1 point** (no combo
   multipliers), so a score of 1000 is a real achievement and easy to remember. Old best scores
   from earlier versions, which used the much bigger point system, are not shown any more.
