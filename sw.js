@@ -9,7 +9,7 @@
  * Bump VERSION whenever the game changes; the new worker installs, takes over, and old
  * "dkeys-" caches are removed, so a refresh shows the update.
  */
-const VERSION = '3.2.2';
+const VERSION = '3.2.3';
 const PREFIX = 'dkeys-';
 const CACHE = PREFIX + 'app-' + VERSION;
 const FONT_CACHE = PREFIX + 'fonts-v1';

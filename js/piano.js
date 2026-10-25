@@ -74,22 +74,7 @@ const PianoAudio = (() => {
     pitches.forEach((p, i) => play(p, dur, i === 0 ? v + 0.1 : v * 0.8));
   }
   function wrong() { play(40, 0.18, 0.7); play(41, 0.18, 0.7); play(46, 0.18, 0.5); }
-  // applause: many short noise bursts through a band-pass filter, fading out
-  function clap(sec = 2.4) {
-    const a = ctx(); if (!a) return;
-    const len = Math.floor(a.sampleRate * 0.035);
-    const buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
-    const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 0.8; bp.connect(master);
-    const t0 = a.currentTime;
-    for (let i = 0; i < sec * 50; i++) {
-      const tt = Math.random() * sec, s = a.createBufferSource(), g = a.createGain();
-      s.buffer = buf; s.playbackRate.value = 0.75 + Math.random() * 0.6;
-      g.gain.value = (0.3 + Math.random() * 0.4) * Math.min(1, (1 - tt / sec) * 1.8 + 0.08);
-      s.connect(g); g.connect(bp); s.start(t0 + tt);
-    }
-  }
-  return { ctx, setVolume, preload, play, chord, wrong, clap, sampleFor };
+  return { ctx, setVolume, preload, play, chord, wrong, sampleFor };
 })();
 
 // ---------- the mode ----------
@@ -106,7 +91,6 @@ const Piano = (() => {
   const STARS_PER_LEVEL = 5;    // stars needed to open each next level
   const LAP_SPEEDUP = 1.15;     // Play mode: every completed round is 15% faster
   const DIFF_HUE = { beginner: 198, easy: 204, medium: 210, hard: 216, expert: 222 };   // blues only
-  const ROW_SPEED = { beginner: 1.9, easy: 2.1, medium: 2.3, hard: 2.5, expert: 2.7 };   // Play mode: tile rows per second in round 1
   const CONFETTI = ['#ffffff', '#8fd3ff', '#4aa3ff', '#1565c0'];
   let U = null, P = null, raf = 0, canvas, cx, mode = 'play';
 
@@ -389,7 +373,10 @@ const Piano = (() => {
       const len = ratio >= 1.9 ? Math.min(4, Math.max(2, Math.round(ratio / 1.5))) : 1;
       P.rowOf.push(row); P.rowLen.push(len); row += len;
     }
-    P.lapRows = row;
+    P.lapRows = row + 1;   // one empty row between a round and the next, faster one
+    // stars: the song's points (1 per tile + 1 per held row) are split in three equal parts
+    P.cum = []; let pts = 0;
+    for (let i = 0; i < n; i++) { pts += 1 + (P.rowLen[i] > 1 ? P.rowLen[i] : 0); P.cum.push(pts); }
     for (let i = 1; i < n; i++) {
       if (c[i] !== c[i - 1]) continue;
       const dir = ev[i][2] > ev[i - 1][2] ? 1 : ev[i][2] < ev[i - 1][2] ? -1 : (c[i - 1] < L / 2 ? 1 : -1);
@@ -401,11 +388,18 @@ const Piano = (() => {
     if (n > 2 && c[n - 1] === c[0]) {
       for (const dlt of [1, -1, 2, -2, 3, -3]) { const nc = c[n - 1] + dlt; if (nc >= 0 && nc < L && nc !== c[n - 2] && nc !== c[0]) { c[n - 1] = nc; break; } }
     }
-    Object.assign(P, { row: 0, lapStartK: 0, hold: null, fill: {}, roundPending: 0, celebrate: null, confetti: [] });
+    Object.assign(P, { row: 0, stars: 0, hold: null, fill: {}, celebrate: null, confetti: [] });
   }
   const rowLenK = k => P.rowLen[k % nTiles()];
   const rowStart = k => P.rowOf[k % nTiles()] + Math.floor(k / nTiles()) * P.lapRows;
-  const rowSpeed = () => ROW_SPEED[P.song.diff] * Math.pow(LAP_SPEEDUP, P.lap);
+  // the song's own tempo: a usual-length note is one row (kept between 1.4 and 6 rows a second)
+  const rowSpeed = () => Math.min(6, Math.max(1.4, P.song.bpm / 60 / P.medGap)) * Math.pow(LAP_SPEEDUP, P.lap);
+  function starUp(text, sub, long) {
+    P.celebrate = { t: long ? 2 : 1.3, text, sub, long };
+    Sound.play('star');
+    for (let i = 0; i < (long ? 80 : 30); i++) P.confetti.push({ x: Math.random(), y: Math.random() * 0.4, vx: (Math.random() - 0.5) * 0.3, vy: -0.1 - Math.random() * 0.35, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 10, c: CONFETTI[i % 4] });
+    hud();
+  }
   function playTap(pid) {
     if (!P || P.over || P.paused) return;
     PianoAudio.ctx();
@@ -419,18 +413,21 @@ const Piano = (() => {
     P.fill[k] = len > 1 ? 0 : 1;
     if (len > 1) P.hold = { k, pid, h0: Math.min(P.row, rowStart(k)), got: 0 };
     P.next++;
-    if (P.next % nTiles() === 0) P.roundPending = 0.35;
+    const n = nTiles();
+    if (P.next % n === 0) {
+      // song complete: three stars, then the song carries straight on, faster, for crowns
+      P.lap++; P.stars = 2 + P.lap;
+      starUp(P.lap === 1 ? t('songDone') : '👑 ' + (P.lap - 1), P.lap === 1 ? '★★★' : '', true);
+    } else if (P.lap === 0) {
+      const s = P.cum[n - 1], got = (P.cum[P.next - 1] >= s * 2 / 3) ? 2 : (P.cum[P.next - 1] >= s / 3) ? 1 : 0;
+      if (got > P.stars) { P.stars = got; starUp('★'.repeat(got), ''); }
+    }
     hud();
   }
   function release(pid) { if (P && P.hold && (pid == null || P.hold.pid === pid)) P.hold = null; }
   function playUpdate(dt) {
     P.confetti = P.confetti.filter(c => { c.vy += 0.45 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.rot += c.vr * dt; return c.y < 1.2; });
-    if (P.celebrate) {
-      // clapping break between rounds: the screen is clear, then the next round waits for START
-      P.celebrate.t -= dt;
-      if (P.celebrate.t <= 0) { P.celebrate = null; P.lapStartK = P.next; P.row = rowStart(P.next); P.started = false; P.fill = {}; hud(); }
-      return;
-    }
+    if (P.celebrate && (P.celebrate.t -= dt) <= 0) P.celebrate = null;   // text only, the tiles never stop
     if (!P.started || P.over) return;
     P.row += dt * rowSpeed();
     if (P.hold) {
@@ -439,17 +436,6 @@ const Piano = (() => {
       const earned = Math.floor(p * len + 1e-6);   // keep holding: +1 for every row the fill climbs
       if (earned > h.got) { P.score += earned - h.got; h.got = earned; P.pops.push({ col: tileCol(h.k), t: 0.4, q: 1, plus: true }); hud(); }
       if (p >= 1) P.hold = null;
-    }
-    if (P.roundPending) {
-      if (!P.hold) P.roundPending -= dt;
-      if (P.roundPending <= 0) {
-        P.roundPending = 0; P.hold = null; P.lap++;
-        P.celebrate = { t: 2.8 };
-        Sound.play('star'); PianoAudio.clap();
-        for (let i = 0; i < 90; i++) P.confetti.push({ x: Math.random(), y: Math.random() * 0.45, vx: (Math.random() - 0.5) * 0.3, vy: -0.1 - Math.random() * 0.35, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 10, c: CONFETTI[i % 4] });
-        hud();
-      }
-      return;
     }
     if (P.row - rowStart(P.next) > 0.3) {   // a tile slid past the line: the song ends (one life)
       P.flashes.push({ k: P.next, t: 0.6 });
@@ -559,7 +545,7 @@ const Piano = (() => {
     const profile = U.profile(), all = data(profile), md = modeData(profile), s = P.song;
     const acc = accuracy();
     let stars, done;
-    if (P.play) { stars = P.lap; done = P.lap > 0; }
+    if (P.play) { stars = P.stars; done = P.lap > 0; }
     else {
       done = P.next >= nTiles();
       stars = 0;
@@ -584,7 +570,7 @@ const Piano = (() => {
     const hasNext = nextIdx < list.length && (P.play ? playStars(U.profile()) >= levelNeed(Math.floor(nextIdx / PER_LEVEL)) : r.done);
     const shownStars = Math.min(3, r.stars), crowns = Math.max(0, r.stars - 3);
     U.openModal(
-      U.h('h2', { class: r.done ? 'win' : 'lose' }, P.play ? (r.stars ? t('roundsDone', r.stars) : t('songOver')) : (r.done ? t('songComplete') : t('songOver'))),
+      U.h('h2', { class: r.done ? 'win' : 'lose' }, P.play ? (r.done ? t('songDone') : r.stars ? t('starsGot', r.stars) : t('songOver')) : (r.done ? t('songComplete') : t('songOver'))),
       U.h('p', { class: 'center' }, title(s)),
       U.h('div', { class: 'res-stars' }, [0, 1, 2].map(i => U.h('span', { class: i < shownStars ? 'on' : '', style: `animation-delay:${0.2 + i * 0.25}s` }, '★')), crowns ? U.h('span', { class: 'on crowns' }, '👑' + crowns) : ''),
       U.h('div', { class: 'res-grid' },
@@ -716,9 +702,7 @@ const Piano = (() => {
   function drawRows(W, H, d, x0, laneW, hitY, T) {
     P.doneRects = [];
     const font = `700 ${Math.round(Math.min(laneW * 0.21, T * 0.3))}px Fredoka, system-ui, sans-serif`;
-    if (P.celebrate) return;
-    const end = P.lapStartK + nTiles();
-    for (let k = Math.max(P.lapStartK, P.next - 6); k < end; k++) {
+    for (let k = Math.max(0, P.next - 6); k < P.next + 80; k++) {
       const len = rowLenK(k), yb = hitY - (rowStart(k) - P.row) * T, h = len * T - 3 * d;
       if (yb - h > H) continue;
       if (yb < -10 * d) break;
@@ -754,10 +738,6 @@ const Piano = (() => {
         }
       }
     }
-    if (!P.started && P.lap > 0 && !P.over) {
-      cx.fillStyle = '#ffffff'; cx.font = `700 ${Math.round(24 * d)}px Fredoka, system-ui, sans-serif`;
-      cx.fillText(t('roundNext', P.lap + 1), W / 2, H * 0.22);
-    }
   }
   function drawCelebration(W, H, d) {
     P.confetti.forEach(c => {
@@ -765,17 +745,17 @@ const Piano = (() => {
       cx.fillStyle = c.c; cx.fillRect(-5 * d, -3 * d, 10 * d, 6 * d); cx.restore();
     });
     if (!P.celebrate) return;
-    const a = Math.min(1, P.celebrate.t / 0.4), bob = Math.sin(P.t * 14) * 6 * d;
-    cx.globalAlpha = a;
-    cx.fillStyle = '#ffffff'; cx.font = `${Math.round(72 * d)}px serif`;
-    cx.fillText('👏', W / 2, H * 0.3 + bob);
-    cx.fillStyle = '#ffffff'; cx.font = `700 ${Math.round(28 * d)}px Fredoka, system-ui, sans-serif`;
-    cx.fillText(t('roundClap', P.lap), W / 2, H * 0.3 + 70 * d);
-    cx.fillStyle = '#8fd3ff'; cx.font = `700 ${Math.round(36 * d)}px Fredoka, system-ui, sans-serif`;
-    cx.fillText(P.lap <= 3 ? '★'.repeat(P.lap) : '👑 ' + (P.lap - 3), W / 2, H * 0.3 + 115 * d);
-    cx.fillStyle = '#ffffff'; cx.font = `600 ${Math.round(20 * d)}px Fredoka, system-ui, sans-serif`;
-    cx.fillText(t('fasterNow'), W / 2, H * 0.3 + 155 * d);
-    cx.globalAlpha = 1;
+    // short text over the moving tiles (no pause, no sound but the star chime)
+    const C = P.celebrate, a = Math.min(1, C.t / 0.4), y = H * 0.2;
+    cx.globalAlpha = a; cx.shadowColor = '#000'; cx.shadowBlur = 10 * d;
+    cx.fillStyle = '#8fd3ff'; cx.font = `700 ${Math.round(40 * d)}px Fredoka, system-ui, sans-serif`;
+    cx.fillText(C.text, W / 2, y);
+    if (C.sub) { cx.font = `700 ${Math.round(32 * d)}px Fredoka, system-ui, sans-serif`; cx.fillText(C.sub, W / 2, y + 44 * d); }
+    if (C.long) {
+      cx.fillStyle = '#ffffff'; cx.font = `600 ${Math.round(20 * d)}px Fredoka, system-ui, sans-serif`;
+      cx.fillText(t('fasterNow'), W / 2, y + (C.sub ? 82 : 40) * d);
+    }
+    cx.shadowBlur = 0; cx.globalAlpha = 1;
   }
   function buildKeyRow() {
     const row = $('pp-keys'); row.innerHTML = '';
@@ -791,8 +771,9 @@ const Piano = (() => {
     $('pp-combo').textContent = P.combo > 1 ? 'x' + P.combo : '';
     const L = lives(), lost = Math.min(L, P.misses + P.wrongs);
     $('pp-lives').textContent = P.practice ? t('practice') : '♥'.repeat(L - lost) + '♡'.repeat(lost);
-    $('pp-progress').style.width = ((P.play && (P.roundPending || P.celebrate) ? 1 : (P.next % nTiles()) / nTiles()) * 100) + '%';
-    $('pp-laps').textContent = P.play ? '★'.repeat(Math.min(3, P.lap)) + '☆'.repeat(Math.max(0, 3 - P.lap)) + (P.lap > 3 ? ' 👑' + (P.lap - 3) : '') : '';
+    $('pp-progress').style.width = ((P.next % nTiles()) / nTiles() * 100) + '%';
+    const st = P.stars || 0;
+    $('pp-laps').textContent = P.play ? '★'.repeat(Math.min(3, st)) + '☆'.repeat(Math.max(0, 3 - st)) + (st > 3 ? ' 👑' + (st - 3) : '') : '';
     const nk = tileCol(P.next);
     document.querySelectorAll('#pp-keys .pp-key').forEach(el => el.classList.toggle('next', +el.dataset.c === nk));
   }
@@ -827,7 +808,7 @@ const Piano = (() => {
         const r = canvas.getBoundingClientRect();
         const px = e.clientX - r.left, py = e.clientY - r.top, R = P.nextRect, pad = 8;
         const inR = R => R && px >= R.x - pad && px <= R.x + R.w + pad && py >= R.y - pad && py <= R.y + R.h + pad;
-        if (P.over || P.celebrate || P.roundPending) return;     // between rounds taps do nothing
+        if (P.over) return;
         if (inR(R)) { playTap(e.pointerId); return; }
         if (!P.started) return;                                   // only the START tile starts the round
         if ((P.doneRects || []).some(inR)) return;                // tiles already played are safe to touch
@@ -838,6 +819,9 @@ const Piano = (() => {
       if (P.phone) focusInput();
     });
     ['pointerup', 'pointercancel'].forEach(ev => window.addEventListener(ev, e => release(e.pointerId)));
+    // long presses on the tiles must not open the copy / paste menu
+    $('scr-piano').addEventListener('contextmenu', e => e.preventDefault());
+    $('scr-piano').addEventListener('selectstart', e => e.preventDefault());
     $('btn-pp-pause').addEventListener('click', pause);
     $('btn-pm-back').addEventListener('click', openHome);
     $('btn-ph-back').addEventListener('click', () => U.back());

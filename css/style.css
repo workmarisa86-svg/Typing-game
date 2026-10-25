@@ -434,6 +434,7 @@ button { font-family: inherit; }
 .pm-modes { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 #scr-piano.tap .pp-keys { display: none; }
 #scr-piano.tap .pp-stage { touch-action: none; cursor: pointer; }
+#scr-piano, #scr-piano *:not(input) { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 .sheet-btn { margin-top: 12px; }
 .sheet-box { margin-top: 10px; max-height: 55vh; overflow: auto; border-radius: 12px; }
 .sheet { background: #fffdf6; border-radius: 12px; padding: 8px 6px; }
