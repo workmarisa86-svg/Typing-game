@@ -142,7 +142,7 @@ Screen**. After the first visit the game works offline.
   request outside its own folder (apart from the Google Fonts the game uses).
 - Every cache it creates starts with `dkeys-`. On update it only deletes caches that start with
   `dkeys-`.
-- `sw.js` has a `VERSION` (now **3.2.0**), and the version is also shown on the start screen. **When you change
+- `sw.js` has a `VERSION` (now **3.2.1**), and the version is also shown on the start screen. **When you change
   the game, bump `VERSION` in `sw.js`** (and `APP_VERSION` in `js/ui.js`). The worker fetches
   from the network first and uses the cache when offline, so a normal refresh shows the update.
 
@@ -238,6 +238,11 @@ matches its source text exactly. See `data/sources/SOURCE.md`. To rebuild, run
     you go: Beginner and Easy use D F J K, Medium S D F J K L, and Hard and Expert A S D F J K L ;.
     In Challenge you have 3 lives. Practice (from Settings) waits for the right key and has no
     game over. Only Play mode follows the music-tiles rules (4 lanes, one mistake).
+- **Tapping like music tiles (v3.2.1)**: in Play mode only a tap **on the glowing tile** counts.
+  Tapping anywhere else (empty space, another lane or a later tile) is a mistake and ends the
+  song. You can tap a tile as soon as it appears on screen, without waiting for it to reach the
+  line. Tiles always fall at a quick, steady speed (at least about 0.6 screen heights per second,
+  15% faster each round), even in slow pieces.
 - **Simple scores**: like music tiles, every tile you play is worth **1 point** (no combo
   multipliers), so a score of 1000 is a real achievement and easy to remember. Old best scores
   from earlier versions, which used the much bigger point system, are not shown any more.

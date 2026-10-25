@@ -372,7 +372,11 @@ const Piano = (() => {
     return P.practice ? 0.85 + 0.2 * prog : 1 + 0.25 * prog;
   }
   const lives = () => P.play ? 1 : 3;   // Play mode: one mistake ends the song (music tiles); Learn mode: three lives
-  const secPerBeat = () => 60 / (P.song.bpm * speedMul());
+  function secPerBeat() {
+    const bps = P.song.bpm / 60 * speedMul();
+    if (P.play && P.ppb) return 1 / Math.max(bps, speedMul() * 0.62 * P.hcss / P.ppb);   // music-tiles pace: tiles keep falling quickly
+    return 1 / bps;
+  }
 
   function update(dt) {
     P.t += dt;
@@ -422,7 +426,7 @@ const Piano = (() => {
     const e = tileEv(k);
     const early = (tileBeat(k) - P.beat) * secPerBeat();
     if (col === tileCol(k)) {
-      if (early > (P.play ? 2.2 : 1.4)) return;           // right key, far too early: ignored, no penalty
+      if (!P.play && early > 1.4) return;                  // Learn mode: right key, far too early: ignored, no penalty
       PianoAudio.chord(e.slice(2), Math.min(e[1], 2) * secPerBeat());
       const err = Math.abs(early);
       const q = err < 0.09 ? 1 : err < 0.2 ? 0.8 : 0.6;
@@ -439,6 +443,15 @@ const Piano = (() => {
       hud();
       if (!P.practice && P.misses + P.wrongs >= lives()) finish();
     }
+  }
+  // Play mode: tapping empty space (or the wrong tile) is a mistake
+  function missTap(col) {
+    if (!P || P.over || P.paused) return;
+    P.wrongs++; P.combo = 0;
+    PianoAudio.wrong();
+    P.flashes.push({ col, t: 0.45 });
+    hud();
+    if (P.misses + P.wrongs >= lives()) finish();
   }
   function accuracy() { const n = P.hits + P.misses + P.wrongs; return n ? P.hits / n * 100 : 100; }
   function finish() {
@@ -523,6 +536,7 @@ const Piano = (() => {
     const hitY = H - 26 * d;
     const base = Math.max(54 * d, Math.min(H * 0.17, 120 * d));        // height of a tile of median length
     const pxPerBeat = base / Math.max(P.medGap, 0.0625);
+    P.ppb = pxPerBeat / d; P.hcss = H / d; P.nextRect = null;
     for (let c = 0; c < n; c++) {
       cx.fillStyle = c % 2 ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.055)';
       cx.fillRect(x0 + c * laneW, 0, laneW, H);
@@ -544,6 +558,7 @@ const Piano = (() => {
       const h = Math.max(16 * d, Math.min(base * 2.4, (nextB - tileBeat(k)) * pxPerBeat - 4 * d));
       const c = tileCol(k), x = x0 + c * laneW + 4 * d, w = laneW - 8 * d;
       const isNext = k === P.next;
+      if (isNext) P.nextRect = { x: x / d, y: (yb - h) / d, w: w / d, h: h / d };
       const lh = hue;
       if (isNext) { cx.shadowColor = `hsl(${lh}, 100%, 70%)`; cx.shadowBlur = 24 * d; }
       rr(x, yb - h, w, h, 12 * d);
@@ -636,8 +651,12 @@ const Piano = (() => {
         e.preventDefault();
         if (!$('modal').classList.contains('hidden') || !P.lane) return;
         const r = canvas.getBoundingClientRect();
-        const c = Math.floor((e.clientX - r.left - P.lane.x0) / P.lane.w);
-        if (c >= 0 && c < P.keys.length) key('', c);
+        const px = e.clientX - r.left, py = e.clientY - r.top, R = P.nextRect, pad = 8;
+        const onTile = R && px >= R.x - pad && px <= R.x + R.w + pad && py >= R.y - pad && py <= R.y + R.h + pad;
+        if (!P.started) { if (onTile) key('', tileCol(0)); return; }   // only the START tile starts the song
+        if (onTile) { key('', tileCol(P.next)); return; }
+        const c = Math.floor((px - P.lane.x0) / P.lane.w);
+        missTap(c >= 0 && c < P.keys.length ? c : tileCol(P.next));
         return;
       }
       if (P.phone) focusInput();
