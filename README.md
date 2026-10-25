@@ -235,8 +235,8 @@ matches its source text exactly. See `data/sources/SOURCE.md`. To rebuild, run
       like music tiles.
     - It always uses 4 lanes.
   - **⌨ Learn mode (keyboard)** keeps the letter keys, ordered by difficulty. It never uses more
-    than 4 lanes: Beginner uses F J, and every other difficulty uses D F J K. It still has the
-    Challenge (3 mistakes) and Practice rules from Settings.
+    than 4 lanes: every difficulty uses D F J K. In Challenge one mistake ends the song, like Play
+    mode. Practice (from Settings) waits for the right key and has no game over.
 - **No more overlapping tiles**: each tile is exactly as tall as the time until the next note, so
   tiles never sit on top of each other.
 - **Background music pauses** while a piece is playing and comes back after.

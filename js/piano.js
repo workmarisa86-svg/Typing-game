@@ -83,7 +83,7 @@ const PianoAudio = (() => {
 const Piano = (() => {
   const $ = id => document.getElementById(id);
   const DIFFS = ['beginner', 'easy', 'medium', 'hard', 'expert'];
-  const KEYS = { beginner: ['f', 'j'], easy: ['d', 'f', 'j', 'k'], medium: ['d', 'f', 'j', 'k'],
+  const KEYS = { beginner: ['d', 'f', 'j', 'k'], easy: ['d', 'f', 'j', 'k'], medium: ['d', 'f', 'j', 'k'],
     hard: ['d', 'f', 'j', 'k'], expert: ['d', 'f', 'j', 'k'] };   // never more than four lanes
   const PHONE_KEYS = ['d', 'f', 'j', 'k'];
   const PLAY_LANES = 4;
@@ -371,7 +371,7 @@ const Piano = (() => {
     const prog = P.next / nTiles();
     return P.practice ? 0.85 + 0.2 * prog : 1 + 0.25 * prog;
   }
-  const lives = () => P.play ? 1 : 3;   // Play mode: one mistake ends the song, like music tiles
+  const lives = () => 1;   // one mistake ends the song in both modes, like music tiles
   const secPerBeat = () => 60 / (P.song.bpm * speedMul());
 
   function update(dt) {
