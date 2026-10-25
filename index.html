@@ -35,7 +35,6 @@
         <button id="btn-new" class="btn btn-gold" data-i18n="newPlayer">+ New player</button>
       </div>
       <div class="start-btns">
-        <button id="btn-piano" class="btn btn-piano" data-i18n="pianoBtn">🎹 Piano Challenge</button>
         <button id="btn-guide-start" class="btn" data-i18n="keyGuide">⌨ Key Guide</button>
         <button id="btn-parent" class="btn" data-i18n="parentView">👪 Parent view</button>
         <button id="btn-install" class="btn btn-green hidden" data-i18n="installApp">⬇ Install app</button>
@@ -75,12 +74,12 @@
   <!-- MAP -->
   <section id="scr-map" class="screen">
     <header class="topbar">
+      <button id="btn-map-hub" class="btn btn-small back-arrow" data-i18n-title="backMenu">←</button>
       <canvas id="map-avatar" width="60" height="60"></canvas>
       <div class="tb-name"><b id="map-name"></b><small id="map-mode"></small></div>
       <div class="tb-stat"><span class="coin"></span><b id="map-coins">0</b></div>
       <div class="tb-stat hide-xs"><span class="star-ico">★</span><b id="map-stars">0</b></div>
       <div class="tb-spacer"></div>
-      <button id="btn-map-piano" class="btn btn-small" data-i18n-title="pianoTitle">🎹<span class="hide-sm" data-i18n="pianoShort"> Piano</span></button>
       <button id="btn-map-smart" class="btn btn-small" data-i18n-title="smartPractice">🎯<span class="hide-sm" data-i18n="smartBtn"> Practice</span></button>
       <button id="btn-map-shop" class="btn btn-small" data-i18n-title="shopTitle">👕<span class="hide-sm" data-i18n="shopBtn"> Shop</span></button>
       <button id="btn-map-stats" class="btn btn-small" data-i18n-title="statsTitle">📊<span class="hide-sm" data-i18n="statsBtn"> Stats</span></button>
@@ -182,11 +181,55 @@
     <div class="page-scroll"><div id="parent-body" class="page-body"></div></div>
   </section>
 
+  <!-- HUB: choose Escape Master or Piano Xpert -->
+  <section id="scr-hub" class="screen hub">
+    <header class="topbar">
+      <button id="btn-hub-back" class="btn btn-small back-arrow" data-i18n-title="playerBtn">←</button>
+      <canvas id="hub-avatar" width="60" height="60"></canvas>
+      <div class="tb-name"><b id="hub-name"></b></div>
+      <div class="tb-stat"><span class="coin"></span><b id="hub-coins">0</b></div>
+      <div class="tb-spacer"></div>
+      <button id="btn-hub-settings" class="btn btn-small" data-i18n-title="settingsBtn">⚙</button>
+    </header>
+    <div class="hub-body">
+      <h2 class="hub-title" data-i18n="chooseGame">What do you want to play?</h2>
+      <div class="hub-cards">
+        <button id="btn-hub-escape" class="hub-card hub-escape">
+          <canvas id="hub-escape-art" width="420" height="240"></canvas>
+          <b data-i18n="escapeMaster">Escape Master</b>
+          <small data-i18n="escapeMasterNote">Type to escape wolves, avalanches and more.</small>
+        </button>
+        <button id="btn-hub-piano" class="hub-card piano">
+          <div class="hub-keys"><span></span><span class="blk"></span><span></span><span class="blk"></span><span></span><span></span><span class="blk"></span><span></span></div>
+          <b data-i18n="pianoXpert">Piano Xpert</b>
+          <small data-i18n="pianoXpertNote">Play famous music on falling piano tiles.</small>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PIANO XPERT home: Play mode or Learn mode -->
+  <section id="scr-piano-home" class="screen piano-theme">
+    <header class="topbar">
+      <button id="btn-ph-back" class="btn btn-small back-arrow" data-i18n-title="backMenu">←</button>
+      <h2 class="tb-title" data-i18n="pianoXpert">Piano Xpert</h2>
+      <div class="tb-spacer"></div>
+      <div class="tb-stat"><span class="coin"></span><b id="ph-coins">0</b></div>
+    </header>
+    <div class="hub-body">
+      <div class="hub-cards">
+        <button id="btn-ph-play" class="hub-card play-mode"><span class="hub-icon">👆</span><b data-i18n="playMode">Play mode</b><small data-i18n="playModeNote">Tap the falling tiles with your fingers.</small></button>
+        <button id="btn-ph-learn" class="hub-card learn-mode"><span class="hub-icon">⌨</span><b data-i18n="learnMode">Learn mode</b><small data-i18n="learnModeNote">Press the letter keys on your keyboard.</small></button>
+      </div>
+      <p class="hub-note" data-i18n="modesSeparate">Each mode has its own progress.</p>
+    </div>
+  </section>
+
   <!-- PIANO CHALLENGE: song selection -->
   <section id="scr-piano-menu" class="screen piano-theme">
     <header class="topbar">
-      <button id="btn-pm-back" class="btn btn-small" data-i18n="back">Back</button>
-      <h2 class="tb-title" data-i18n="pianoTitle">Piano Challenge</h2>
+      <button id="btn-pm-back" class="btn btn-small back-arrow" data-i18n-title="back">←</button>
+      <h2 class="tb-title" id="pm-title">Piano Xpert</h2>
       <div class="tb-spacer"></div>
       <div class="tb-stat"><span class="coin"></span><b id="pm-coins">0</b></div>
     </header>
@@ -196,7 +239,7 @@
   <!-- PIANO CHALLENGE: playing -->
   <section id="scr-piano" class="screen piano-theme">
     <div class="pp-hud">
-      <div class="pp-info"><b id="pp-title"></b><small id="pp-composer"></small></div>
+      <div class="pp-info"><b id="pp-title"></b><span id="pp-laps" class="pp-laps"></span></div>
       <div class="pp-stats"><span id="pp-lives" class="pp-lives"></span><b id="pp-score">0</b><span id="pp-combo" class="pp-combo"></span></div>
       <button id="btn-pp-pause" class="round-btn" data-i18n-title="paused">❚❚</button>
     </div>

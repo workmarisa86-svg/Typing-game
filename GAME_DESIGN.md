@@ -195,6 +195,19 @@ Update the README, bump the service worker version so players get the update, an
 - Add a tap mode: tiles fall and you tap them with your fingers (or the mouse), no keyboard letters.
 - Bug: pressing the first key to start a piece started it but took away a life. Fixed.
 
+## Menu and Piano Xpert feedback (built in v3.2.0)
+
+- After choosing a player (gender, look, clothes), the main menu offers two games: Escape Master (the typing adventure) and Piano Xpert. A back arrow switches between them.
+- Piano Xpert offers Play mode (tap the tiles) and Learn mode (type the letter keys). Progress is separate per mode.
+- Play mode is like Music Tiles 2:
+  - songs are listed top to bottom in levels of three, unlocked with stars
+  - the first tile waits at the bottom and starts the music
+  - tiles fall at a steady speed, and tapping fast never speeds them up
+  - a song repeats faster each time it is completed and only ends after 3 mistakes
+  - the background is our own creative design (not copied)
+- Tiles never overlap. Background music pauses while a piece plays. The composer appears under the title in the song list, not while playing. The song lists are more colorful.
+- All 15 Bach two-part Inventions are included (same public-domain source rules).
+
 ## Ideas for a future Stage 3 (not requested yet)
 
 - More Spanish-only worlds and Spanish verse paragraphs for every world

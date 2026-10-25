@@ -75,6 +75,16 @@ are kept in `music/sources/`.
 | Invention No. 8, BWV 779 | J. S. Bach | inv8.mid | Mutopia `BachJS/BWV779` (Mutopia-2008/06/15-61) | Public Domain |
 | Invention No. 13, BWV 784 | J. S. Bach | inv13.mid | Mutopia `BachJS/BWV784` (Mutopia-2008/06/15-59) | Public Domain |
 | Invention No. 14, BWV 785 | J. S. Bach | inv14.mid | Mutopia `BachJS/BWV785` (Mutopia-2008/06/15-72) | Public Domain |
+| Invention No. 2, BWV 773 | J. S. Bach | inv2.mid | Mutopia `BachJS/BWV773` (Mutopia-2008/06/15-58) | Public Domain |
+| Invention No. 3, BWV 774 | J. S. Bach | inv3.mid | Mutopia `BachJS/BWV774` (Mutopia-2008/06/15-70) | Public Domain |
+| Invention No. 5, BWV 776 | J. S. Bach | inv5.mid | Mutopia `BachJS/BWV776` (Mutopia-2008/06/15-55) | Public Domain |
+| Invention No. 6, BWV 777 | J. S. Bach | inv6.mid | Mutopia `BachJS/BWV777` (Mutopia-2008/06/15-159) | CC BY-SA 3.0 |
+| Invention No. 7, BWV 778 | J. S. Bach | inv7.mid | Mutopia `BachJS/BWV778` (Mutopia-2009/05/09-73) | Public Domain |
+| Invention No. 9, BWV 780 | J. S. Bach | inv9.mid | Mutopia `BachJS/BWV780` (Mutopia-2008/06/15-171) | CC BY-SA 3.0 |
+| Invention No. 10, BWV 781 | J. S. Bach | inv10.mid | Mutopia `BachJS/BWV781` (Mutopia-2008/06/15-62) | Public Domain |
+| Invention No. 11, BWV 782 | J. S. Bach | inv11.mid | Mutopia `BachJS/BWV782` (Mutopia-2008/06/15-71) | Public Domain |
+| Invention No. 12, BWV 783 | J. S. Bach | inv12.mid | Mutopia `BachJS/BWV783` (Mutopia-2008/06/15-174) | CC BY-SA 3.0 |
+| Invention No. 15, BWV 786 | J. S. Bach | inv15.mid | Mutopia `BachJS/BWV786` (Mutopia-2008/08/23-68) | Public Domain |
 | Prelude in C minor, BWV 847 | J. S. Bach | bwv847.mid | Mutopia `BachJS/BWV847/bwv847a` (Mutopia-2006/07/02-550) | Public Domain |
 | Italian Concerto, BWV 971, 1st mvt | J. S. Bach | bwv971_mvt1.mid | Mutopia `BachJS/BWV971/piano` (Mutopia-2012/02/05-1826) | CC BY-SA 3.0 |
 | Toccata and Fugue in D minor, BWV 565 | traditionally credited to J. S. Bach | toccata.mid | Mutopia `BachJS/BWV565/ToccataFugue` (Mutopia-2011/09/11-1780) | Public Domain |

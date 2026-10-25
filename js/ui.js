@@ -1,7 +1,7 @@
 /* Screens, menus, map, shop, stats, parent view, certificates, key guide and input wiring */
 'use strict';
 
-const APP_VERSION = '3.1.0';
+const APP_VERSION = '3.2.0';
 
 const UI = (() => {
   const $ = id => document.getElementById(id);
@@ -149,19 +149,6 @@ const UI = (() => {
         h('button', { class: 'btn btn-ghost', onclick: closeModal }, t('keep')),
         h('button', { class: 'btn btn-danger', onclick: () => { Store.remove(p.id); closeModal(); renderStart(); } }, t('delete'))));
   }
-  function pianoFromStart() {
-    Sound.unlock();
-    if (!Store.profiles.length) { toast(t('createFirst'), 2400); newProfile(); return; }
-    if (Store.profiles.length === 1) { profile = Store.profiles[0]; Store.select(profile.id); applyAudio(); Piano.openMenu(); return; }
-    openModal(h('h2', {}, '🎹 ' + t('whoPlaying')),
-      h('div', { class: 'profile-list' }, Store.profiles.map(p => {
-        const cv = h('canvas', { width: 108, height: 108 });
-        const card = h('div', { class: 'profile-card', role: 'button', tabindex: '0', onclick: () => { closeModal(); profile = p; Store.select(p.id); applyAudio(); applyStatic(); Piano.openMenu(); } },
-          cv, h('div', { class: 'pc-info' }, h('b', {}, p.name)));
-        headshot(cv, p.look);
-        return card;
-      })));
-  }
   function choose(p) {
     Sound.unlock(); Sound.play('click');
     Store.select(p.id); profile = p; applyAudio(); applyStatic();
@@ -212,7 +199,7 @@ const UI = (() => {
       row(t('blood'), t('bloodNote'), onOff('blood')),
       h('div', { class: 'row-btns' },
         h('button', { class: 'btn btn-ghost', onclick: () => { closeModal(); editLook(); } }, t('editLook')),
-        h('button', { class: 'btn btn-gold', onclick: () => { closeModal(); if (thenMap || currentScreen === 'scr-map') openMap(); } }, thenMap ? t('play') + ' ▶' : t('done'))));
+        h('button', { class: 'btn btn-gold', onclick: () => { closeModal(); if (thenMap || currentScreen === 'scr-hub') openHub(); else if (currentScreen === 'scr-map') openMap(); } }, thenMap ? t('play') + ' ▶' : t('done'))));
   }
 
   // ---------- profile creator ----------
@@ -284,7 +271,7 @@ const UI = (() => {
       const look = Object.assign({}, draft);
       if (editing.look.gender !== look.gender) { delete look.hat; delete look.acc; }
       else { look.hat = editing.look.hat; look.acc = editing.look.acc; look.hatColor = editing.look.hatColor; }
-      editing.look = look; editing.name = name; Store.save(); profile = editing; openMap(); return;
+      editing.look = look; editing.name = name; Store.save(); profile = editing; openHub(); return;
     }
     profile = Store.create(name, Object.assign({}, draft));
     profile.settings.uiLang = Store.uiLang; profile.settings.typeLang = Store.uiLang;
@@ -292,6 +279,28 @@ const UI = (() => {
     applyAudio();
     show('scr-start'); renderStart(); profile = Store.current();
     openSettings(true);
+  }
+
+  // ---------- hub: Escape Master or Piano Xpert ----------
+  let hubRaf = 0;
+  function openHub() {
+    if (!profile) { show('scr-start'); renderStart(); return; }
+    show('scr-hub'); applyStatic();
+    $('hub-name').textContent = profile.name;
+    $('hub-coins').textContent = profile.coins;
+    headshot($('hub-avatar'), profile.look);
+    cancelAnimationFrame(hubRaf);
+    const cv = $('hub-escape-art'), c = cv.getContext('2d'), t0 = performance.now();
+    const loop = now => {
+      if (currentScreen !== 'scr-hub') return;
+      const tt = (now - t0) / 1000, sc = cv.height / 500, W = cv.width / sc;
+      c.setTransform(sc, 0, 0, sc, 0, 0);
+      const g = Art.drawScene(c, W, 500, 'forest', tt * 140, tt, { simple: true });
+      Art.drawBeast(c, 'wolf', W * 0.22, g + 4, 0.9, tt * 9);
+      Art.drawPerson(c, profile.look, Art.runPose(tt * 9, 1), W * 0.68, g, 1, { mood: 'shout', sway: Math.sin(tt * 9) });
+      hubRaf = requestAnimationFrame(loop);
+    };
+    hubRaf = requestAnimationFrame(loop);
   }
 
   // ---------- map ----------
@@ -939,8 +948,8 @@ const UI = (() => {
     const avgAcc = hist.length ? hist.reduce((a, x) => a + x.acc, 0) / hist.length : 0;
     const avgWpm = hist.length ? hist.reduce((a, x) => a + x.wpm, 0) / hist.length : 0;
     const last = p.history.length ? p.history[p.history.length - 1].t : 0;
-    const pd = p.piano || { songs: {} };
-    const piano = Object.values(pd.songs).filter(r => r.done).length + ' / ' + ((window.PIANO_SONGS || []).length || 45);
+    const pd = Piano.data(p), nSongs = (window.PIANO_SONGS || []).length;
+    const piano = `▶ ${Object.values(pd.play.songs).filter(r => r.done).length} · ⌨ ${Object.values(pd.learn.songs).filter(r => r.done).length} / ${nSongs}`;
     return { piano, plays: hist.length, done: list.filter(l => won(p, l)).length, total: list.length, stars: totalStars(p), best: Math.round(p.stats.bestWpm || 0),
       avgAcc: Math.round(avgAcc), avgWpm: Math.round(avgWpm), keys: p.stats.keys, last, weak: weakKeys(p).slice(0, 5).map(w => w.k),
       certs: Object.keys(p.certs).length, worlds: WORLDS.filter(w => list.some(l => l.world === WORLDS.indexOf(w))).length };
@@ -1085,10 +1094,13 @@ const UI = (() => {
     $('btn-map-shop').addEventListener('click', openShop);
     $('btn-map-stats').addEventListener('click', openStats);
     $('btn-map-smart').addEventListener('click', smartPractice);
-    $('btn-map-piano').addEventListener('click', () => Piano.openMenu());
-    $('btn-piano').addEventListener('click', pianoFromStart);
+    $('btn-map-hub').addEventListener('click', openHub);
+    $('btn-hub-back').addEventListener('click', () => { show('scr-start'); renderStart(); });
+    $('btn-hub-settings').addEventListener('click', () => openSettings(false));
+    $('btn-hub-escape').addEventListener('click', () => { Sound.play('click'); openMap(); });
+    $('btn-hub-piano').addEventListener('click', () => { Sound.play('click'); Piano.openHome(); });
     Piano.init({ h, openModal, closeModal, toast, show, applyStatic, isPhone, lang: () => lang(), profile: () => profile,
-      screen: () => currentScreen, back: () => { if (profile && currentScreen !== 'scr-start') openMap(); else { show('scr-start'); renderStart(); } } });
+      screen: () => currentScreen, back: openHub });
     document.querySelectorAll('.btn-back-map').forEach(b => b.addEventListener('click', () => openMap()));
     $('btn-parent-back').addEventListener('click', () => { if (profile) openMap(); else { show('scr-start'); renderStart(); } });
     $('btn-guide-back').addEventListener('click', () => { if (guideBack === 'scr-map' && profile) openMap(); else { show('scr-start'); renderStart(); } });

@@ -210,8 +210,8 @@ song('k545-rondo', 'Sonata K. 545, 3rd movement (Rondo)', 'Sonata K. 545, 3.er m
 song('cello-prelude', 'Cello Suite No. 1: Prelude, BWV 1007', 'Suite para violonchelo n.º 1: Preludio, BWV 1007', 'Johann Sebastian Bach', 'hard', 'bwv1007_prelude.mid', 'mutopia', mid('bwv1007_prelude.mid', 'full'))
 song('wachet-auf-645', 'Sleepers, Wake! Chorale Prelude, BWV 645', 'Despertad: preludio coral, BWV 645', 'Johann Sebastian Bach', 'hard', 'bwv645.mid', 'mutopia', mid('bwv645.mid', 'full'))
 
-for n, f in [(1, 'inv1.mid'), (4, 'inv4.mid'), (8, 'inv8.mid'), (13, 'inv13.mid'), (14, 'inv14.mid')]:
-    bwv = {1: 772, 4: 775, 8: 779, 13: 784, 14: 785}[n]
+for n in range(1, 16):                      # all fifteen two-part Inventions, BWV 772-786
+    f, bwv = 'inv%d.mid' % n, 771 + n
     song('invention-%d' % n, 'Invention No. %d, BWV %d' % (n, bwv), 'Invención n.º %d, BWV %d' % (n, bwv), 'Johann Sebastian Bach', 'expert', f, 'mutopia', mid(f, 'full'), max_tiles=600)
 song('prelude-cm-847', 'Prelude in C minor, BWV 847', 'Preludio en do menor, BWV 847', 'Johann Sebastian Bach', 'expert', 'bwv847.mid', 'mutopia', mid('bwv847.mid', 'full'), max_tiles=600)
 song('fugue-cm-847', 'Fugue in C minor, BWV 847', 'Fuga en do menor, BWV 847', 'Johann Sebastian Bach', 'expert', 'fugue847.mid', 'mutopia', mid('fugue847.mid', 'full'), max_tiles=600)

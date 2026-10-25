@@ -78,90 +78,126 @@ const PianoAudio = (() => {
 })();
 
 // ---------- the mode ----------
+
+// ---------- Piano Xpert: Play mode (tap the tiles) and Learn mode (letter keys) ----------
 const Piano = (() => {
   const $ = id => document.getElementById(id);
   const DIFFS = ['beginner', 'easy', 'medium', 'hard', 'expert'];
-  const KEYS = { beginner: ['f', 'j'], easy: ['d', 'f', 'j', 'k'], medium: ['s', 'd', 'f', 'j', 'k', 'l'],
-    hard: ['a', 's', 'd', 'f', 'j', 'k', 'l', ';'], expert: ['a', 's', 'd', 'f', 'j', 'k', 'l', ';'] };
+  const KEYS = { beginner: ['d', 'f', 'j', 'k'], easy: ['d', 'f', 'j', 'k'], medium: ['s', 'd', 'f', 'j', 'k', 'l'],
+    hard: ['a', 's', 'd', 'f', 'j', 'k', 'l', ';'], expert: ['a', 's', 'd', 'f', 'j', 'k', 'l', ';'] };   // Learn mode lanes (Play mode always uses 4)
   const PHONE_KEYS = ['d', 'f', 'j', 'k'];
-  let U = null;            // helpers from UI
-  let P = null;            // the running song state
-  let raf = 0, canvas, cx;
+  const PLAY_LANES = 4;
+  const PER_LEVEL = 3;          // Play mode: three songs per level
+  const STARS_PER_LEVEL = 5;    // stars needed to open each next level
+  const LAP_SPEEDUP = 1.15;     // Play mode: every completed round is 15% faster
+  const DIFF_HUE = { beginner: 198, easy: 204, medium: 210, hard: 216, expert: 222 };   // blues only
+  let U = null, P = null, raf = 0, canvas, cx, mode = 'play';
 
   function songs() { return window.PIANO_SONGS || []; }
+  const title = s => U.lang() === 'es' ? s.titleEs : s.title;
+  // each mode keeps its own progress
   function data(profile) {
-    profile.piano = profile.piano || { songs: {}, plays: 0, notes: 0, best: 0 };
-    return profile.piano;
+    const pd = profile.piano = profile.piano || {};
+    if (pd.songs && !pd.learn) { pd.learn = { songs: pd.songs }; delete pd.songs; }   // older saves = Learn mode
+    pd.learn = pd.learn || { songs: {} };
+    pd.play = pd.play || { songs: {} };
+    pd.plays = pd.plays || 0; pd.notes = pd.notes || 0; pd.best = pd.best || 0;
+    return pd;
   }
-  function unlockedIdx(profile) {
-    const d = data(profile), list = songs();
-    let i = 0;
-    while (i < list.length - 1 && d.songs[list[i].id] && d.songs[list[i].id].done) i++;
-    return i;
-  }
-  function isOpen(profile, i) {
-    const d = data(profile).songs, list = songs();
+  const modeData = (profile, m) => data(profile)[m || mode];
+  function keysFor(diff, phone) { const k = KEYS[diff]; return phone && k.length > 4 ? PHONE_KEYS : k; }
+  const diffName = d => t('pd_' + d);
+
+  // ---------- Learn mode unlocks: in order, finished songs stay open ----------
+  function learnOpen(profile, i) {
+    const d = modeData(profile, 'learn').songs, list = songs();
     return i === 0 || !!(d[list[i - 1].id] && d[list[i - 1].id].done) || !!(d[list[i].id] && d[list[i].id].done);
   }
-  function keysFor(diff, phone) {
-    const k = KEYS[diff];
-    return phone && k.length > 4 ? PHONE_KEYS : k;
+  // ---------- Play mode: levels of three songs, opened with stars ----------
+  function playStars(profile) {
+    return Object.values(modeData(profile, 'play').songs).reduce((a, r) => a + Math.min(3, r.stars || 0), 0);
   }
-  const diffName = d => t('pd_' + d);
-  // 'keys' = play with letter keys, 'tap' = tap the falling tiles with fingers or the mouse
-  function inputMode() {
-    const p = U.profile(); if (!p) return 'keys';
-    const d = data(p);
-    return d.input || (U.isPhone() ? 'tap' : 'keys');
-  }
-  const tapMode = () => inputMode() === 'tap';
+  const levelNeed = k => k * STARS_PER_LEVEL;
 
-  // ---------- song selection ----------
-  function openMenu() {
-    const profile = U.profile();
-    if (!profile) return;
+  // ---------- Piano Xpert home: choose Play or Learn ----------
+  function openHome() {
+    const profile = U.profile(); if (!profile) return;
+    data(profile);
+    U.show('scr-piano-home'); U.applyStatic();
+    $('ph-coins').textContent = profile.coins;
+  }
+  function openMenu(m) {
+    if (m) mode = m;
+    const profile = U.profile(); if (!profile) return;
     U.show('scr-piano-menu'); U.applyStatic();
-    const list = songs(), d = data(profile), unl = unlockedIdx(profile);
+    $('pm-title').textContent = mode === 'play' ? '▶ ' + t('playMode') : '⌨ ' + t('learnMode');
     $('pm-coins').textContent = profile.coins;
     const body = $('pm-body'); body.innerHTML = '';
-    const phone = U.isPhone();
-    body.append(U.h('p', { class: 'pm-intro' }, tapMode() ? t('pianoIntroTap') : t('pianoIntro')));
-    const modes = U.h('div', { class: 'seg pm-mode' });
-    [['keys', '⌨ ' + t('pianoKeys')], ['tap', '👆 ' + t('pianoTap')]].forEach(([v, label]) => {
-      modes.append(U.h('button', { class: inputMode() === v ? 'on' : '', onclick: () => { data(profile).input = v; Store.save(); Sound.play('click'); openMenu(); } }, label));
-    });
-    body.append(U.h('div', { class: 'pm-modes' }, U.h('b', {}, t('pianoPlayWith')), modes));
-    DIFFS.forEach(diff => {
-      const group = list.map((s, i) => ({ s, i })).filter(x => x.s.diff === diff);
-      if (!group.length) return;
-      const keys = keysFor(diff, phone || tapMode());
-      body.append(U.h('div', { class: 'pm-head' },
-        U.h('h3', {}, diffName(diff)),
-        U.h('div', { class: 'pm-keys' }, keys.map(k => U.h('span', { class: 'pm-key' }, k.toUpperCase())))));
-      const grid = U.h('div', { class: 'pm-grid' });
-      group.forEach(({ s, i }) => {
-        const r = d.songs[s.id] || {};
-        const locked = !isOpen(profile, i);
-        const card = U.h('button', { class: 'pm-song' + (locked ? ' locked' : '') + (r.done ? ' done' : '') + (i === unl ? ' next' : '') },
-          U.h('b', {}, (locked ? '🔒 ' : '') + (U.lang() === 'es' ? s.titleEs : s.title)),
-          U.h('small', {}, s.composer),
-          U.h('span', { class: 'pm-stars' }, '★'.repeat(r.stars || 0) + '☆'.repeat(3 - (r.stars || 0))),
-          r.best ? U.h('small', { class: 'pm-best' }, t('bestScore') + ': ' + r.best) : '');
-        card.addEventListener('click', () => {
-          if (locked) { Sound.play('nope'); U.toast(t('pianoLocked')); return; }
-          songIntro(i);
-        });
-        grid.append(card);
-      });
-      body.append(grid);
-    });
+    body.classList.toggle('play-list', mode === 'play');
+    if (mode === 'play') playList(profile, body); else learnList(profile, body);
     const next = body.querySelector('.pm-song.next');
     if (next) requestAnimationFrame(() => next.scrollIntoView({ block: 'center' }));
   }
+  function songCard(s, i, r, locked, extraCls, hue, onclick) {
+    const stars = Math.min(3, r.stars || 0), crowns = Math.max(0, (r.stars || 0) - 3);
+    const card = U.h('button', { class: 'pm-song' + (locked ? ' locked' : '') + (r.done || stars ? ' done' : '') + (extraCls || ''),
+      style: locked ? '' : `--h:${hue}` },
+      U.h('span', { class: 'pm-note' }, locked ? '🔒' : '♪'),
+      U.h('span', { class: 'pm-text' }, U.h('b', {}, title(s)), U.h('small', {}, s.composer)),
+      U.h('span', { class: 'pm-right' },
+        U.h('span', { class: 'pm-stars' }, '★'.repeat(stars) + '☆'.repeat(3 - stars) + (crowns ? ' 👑' + crowns : '')),
+        r.top ? U.h('small', { class: 'pm-best' }, t('bestScore') + ' ' + r.top) : ''));
+    card.addEventListener('click', onclick);
+    return card;
+  }
+  function playList(profile, body) {
+    const list = songs(), d = modeData(profile, 'play').songs, have = playStars(profile);
+    body.append(U.h('div', { class: 'pm-banner' }, U.h('b', {}, '★ ' + have), U.h('span', {}, t('playIntro'))));
+    let nextMarked = false;
+    for (let k = 0; k * PER_LEVEL < list.length; k++) {
+      const open = have >= levelNeed(k);
+      const hue = 198 + (k % 5) * 6;
+      body.append(U.h('div', { class: 'pm-level' + (open ? '' : ' locked'), style: `--h:${hue}` },
+        U.h('b', {}, t('levelN', k + 1)),
+        open ? '' : U.h('span', {}, '🔒 ' + t('needStars', levelNeed(k)))));
+      list.slice(k * PER_LEVEL, (k + 1) * PER_LEVEL).forEach((s, j) => {
+        const i = k * PER_LEVEL + j, r = d[s.id] || {};
+        let cls = '';
+        if (open && !r.stars && !nextMarked) { cls = ' next'; nextMarked = true; }
+        body.append(songCard(s, i, r, !open, cls, hue + j * 2, () => {
+          if (!open) { Sound.play('nope'); U.toast(t('needStarsToast', levelNeed(k) - have)); return; }
+          songIntro(i);
+        }));
+      });
+    }
+  }
+  function learnList(profile, body) {
+    const list = songs(), d = modeData(profile, 'learn').songs, phone = U.isPhone();
+    body.append(U.h('div', { class: 'pm-banner' }, U.h('span', {}, t('learnIntro'))));
+    let nextMarked = false;
+    DIFFS.forEach(diff => {
+      const group = list.map((s, i) => ({ s, i })).filter(x => x.s.diff === diff);
+      if (!group.length) return;
+      body.append(U.h('div', { class: 'pm-level', style: `--h:${DIFF_HUE[diff]}` },
+        U.h('b', {}, diffName(diff)),
+        U.h('span', { class: 'pm-keys' }, keysFor(diff, phone).map(k => U.h('span', { class: 'pm-key' }, k.toUpperCase())))));
+      group.forEach(({ s, i }, j) => {
+        const r = d[s.id] || {};
+        const locked = !learnOpen(profile, i);
+        let cls = '';
+        if (!locked && !r.done && !nextMarked) { cls = ' next'; nextMarked = true; }
+        body.append(songCard(s, i, r, locked, cls, DIFF_HUE[diff] + (j % 3) * 2, () => {
+          if (locked) { Sound.play('nope'); U.toast(t('pianoLocked')); return; }
+          songIntro(i);
+        }));
+      });
+    });
+  }
   function songIntro(i) {
     const s = songs()[i], profile = U.profile();
-    const keys = keysFor(s.diff, U.isPhone() || tapMode());
-    const practice = profile.settings.mode === 'practice';
+    const play = mode === 'play';
+    const keys = keysFor(s.diff, U.isPhone());
+    const practice = !play && profile.settings.mode === 'practice';
     const sheetBox = U.h('div', { class: 'sheet-box hidden' });
     const sheetBtn = U.h('button', { class: 'btn btn-ghost sheet-btn', onclick: () => {
       if (!sheetBox.firstChild) sheetBox.append(sheetMusic(s));
@@ -169,11 +205,13 @@ const Piano = (() => {
       sheetBtn.textContent = '🎼 ' + (sheetBox.classList.contains('hidden') ? t('showSheet') : t('hideSheet'));
     } }, '🎼 ' + t('showSheet'));
     const box = U.openModal(
-      U.h('h2', {}, '🎹 ' + (U.lang() === 'es' ? s.titleEs : s.title)),
-      U.h('p', { class: 'center' }, s.composer + ' · ' + diffName(s.diff)),
-      tapMode() ? U.h('p', { class: 'center' }, '👆 ' + t('pianoTapHow', keys.length)) : U.h('div', { class: 'intro-keys' }, keys.map(k => U.h('div', { class: 'kcap', style: 'background:#fff' }, k.toUpperCase()))),
+      U.h('h2', {}, '🎹 ' + title(s)),
+      U.h('p', { class: 'center' }, s.composer),
+      U.h('p', { class: 'center small' }, diffName(s.diff)),
+      play ? U.h('p', { class: 'center' }, '👆 ' + t('playHow'))
+        : U.h('div', { class: 'intro-keys' }, keys.map(k => U.h('div', { class: 'kcap', style: 'background:#fff' }, k.toUpperCase()))),
       U.h('p', { class: 'center small' }, t('pianoHow')),
-      U.h('p', { class: 'center' }, U.h('b', {}, practice ? t('pianoPracticeRule') : t('pianoChallengeRule'))),
+      U.h('p', { class: 'center' }, U.h('b', {}, play ? t('playRule') : practice ? t('pianoPracticeRule') : t('pianoChallengeRule'))),
       U.h('div', { class: 'row-btns' },
         U.h('button', { class: 'btn btn-ghost', onclick: U.closeModal }, t('back')),
         U.h('button', { class: 'btn btn-gold', onclick: () => { U.closeModal(); start(i); } }, t('start') + ' ▶')),
@@ -281,37 +319,39 @@ const Piano = (() => {
   function start(i) {
     const profile = U.profile();
     const s = songs()[i];
+    const play = mode === 'play';
     const phone = U.isPhone();
-    const tap = tapMode();
-    const keys = keysFor(s.diff, phone || tap);
+    const keys = play ? PHONE_KEYS.slice(0, PLAY_LANES) : keysFor(s.diff, phone);
     const gaps = [];
     for (let k = 1; k < s.ev.length; k++) { const g = s.ev[k][0] - s.ev[k - 1][0]; if (g > 0) gaps.push(g); }
     gaps.sort((a, b) => a - b);
     const medGap = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 1;
+    const last = s.ev[s.ev.length - 1];
     P = {
-      song: s, index: i, keys, cols: assignColumns(s.ev, keys.length),
-      practice: profile.settings.mode === 'practice', phone,
-      beat: -2, next: 0, hits: 0, misses: 0, wrongs: 0, combo: 0, bestCombo: 0, score: 0,
+      song: s, index: i, keys, cols: assignColumns(s.ev, keys.length), play,
+      practice: !play && profile.settings.mode === 'practice', phone,
+      beat: s.ev[0][0], next: 0, hits: 0, misses: 0, wrongs: 0, combo: 0, bestCombo: 0, score: 0,
       started: false, over: false, paused: false, flashes: [], pops: [], pressed: {},
-      medGap, t: 0, loaded: false, perfect: 0, tap
+      medGap, t: 0, loaded: false, lap: 0, lapLen: last[0] + Math.max(last[1], medGap) + 2, banner: null,
+      notes: Array.from({ length: 22 }, (_, k) => ({ x: Math.random(), y: Math.random(), s: 0.5 + Math.random(), c: k % 3 }))
     };
-    document.getElementById('scr-piano').classList.toggle('tap', tap);
     document.body.classList.toggle('phone', phone);
     U.show('scr-piano'); U.applyStatic();
-    $('pp-title').textContent = (U.lang() === 'es' ? s.titleEs : s.title);
-    $('pp-composer').textContent = s.composer;
+    $('scr-piano').classList.toggle('tap', play);
+    $('pp-title').textContent = title(s);
     buildKeyRow();
+    Sound.pauseMusic(true);   // no background music while a piece plays
     PianoAudio.setVolume((profile.settings.volume == null ? 80 : profile.settings.volume) / 100);
     const pitches = new Set();
     s.ev.forEach(e => e.slice(2).forEach(p => pitches.add(p)));
     $('pp-loading').classList.remove('hidden');
     PianoAudio.preload(pitches).then(() => { if (P && P.song === s) { P.loaded = true; $('pp-loading').classList.add('hidden'); } });
-    if (phone && !tap) focusInput();
+    if (phone && !play) focusInput();
     resize();
     cancelAnimationFrame(raf);
-    let last = performance.now();
+    let lastT = performance.now();
     const loop = now => {
-      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
       if (P && !P.paused) update(dt);
       if (P) draw();
       raf = requestAnimationFrame(loop);
@@ -319,37 +359,52 @@ const Piano = (() => {
     raf = requestAnimationFrame(loop);
     hud();
   }
-  function stop() { cancelAnimationFrame(raf); P = null; }
+  function stop() { cancelAnimationFrame(raf); if (P) Sound.pauseMusic(false); P = null; }
+
+  // tile k (Play mode repeats the song in faster rounds)
+  const nTiles = () => P.song.ev.length;
+  const tileEv = k => P.song.ev[k % nTiles()];
+  const tileBeat = k => tileEv(k)[0] + Math.floor(k / nTiles()) * P.lapLen;
+  const tileCol = k => P.cols[k % nTiles()];
   function speedMul() {
-    const prog = P.next / P.song.ev.length;
-    return P.practice ? 0.85 + 0.2 * prog : 1 + 0.3 * prog;   // speed slowly rises during a song
+    if (P.play) return Math.pow(LAP_SPEEDUP, Math.floor(P.next / nTiles()));   // steady inside a round
+    const prog = P.next / nTiles();
+    return P.practice ? 0.85 + 0.2 * prog : 1 + 0.25 * prog;
   }
+  const lives = () => P.play ? 1 : 3;   // Play mode: one mistake ends the song (music tiles); Learn mode: three lives
   const secPerBeat = () => 60 / (P.song.bpm * speedMul());
 
   function update(dt) {
     P.t += dt;
-    if (!P.started || P.over) return;
-    const ev = P.song.ev;
-    const nextBeat = P.next < ev.length ? ev[P.next][0] : Infinity;
-    let adv = dt / secPerBeat();
-    if (P.practice && P.beat + adv > nextBeat) adv = Math.max(0, nextBeat - P.beat); // wait for the right key
-    P.beat += adv;
-    // a tile that slides past the line is a miss (challenge)
-    if (!P.practice && P.next < ev.length && (P.beat - nextBeat) * secPerBeat() > 0.32) {
-      miss(P.next, true);
-      P.next++;
-      if (P.next >= ev.length) finish(true);
-    }
+    P.notes.forEach(n => { n.y -= dt * 0.03 * n.s; if (n.y < -0.05) { n.y = 1.05; n.x = Math.random(); } });
     P.flashes = P.flashes.filter(f => (f.t -= dt) > 0);
     P.pops = P.pops.filter(f => (f.t -= dt) > 0);
+    if (P.banner) { P.banner.t -= dt; if (P.banner.t <= 0) P.banner = null; }
+    if (!P.started || P.over) return;
+    const nb = (!P.play && P.next >= nTiles()) ? Infinity : tileBeat(P.next);
+    let adv = dt / secPerBeat();
+    if (P.practice && P.beat + adv > nb) adv = Math.max(0, nb - P.beat);   // Learn practice: wait for the right key
+    P.beat += adv;
+    // a tile that slides past the line is a miss
+    if (!P.practice && nb !== Infinity && (P.beat - nb) * secPerBeat() > 0.3) {
+      P.flashes.push({ k: P.next, t: 0.45 });
+      P.misses++; P.combo = 0; PianoAudio.wrong();
+      advance();
+      hud();
+      if (P.misses + P.wrongs >= lives()) finish();
+    }
   }
-  function miss(idx, passed) {
-    P.misses += passed ? 1 : 0;
-    P.combo = 0;
-    PianoAudio.wrong();
-    P.flashes.push({ col: idx != null ? P.cols[idx] : null, t: 0.35, red: true });
-    hud();
-    if (!P.practice && P.misses + P.wrongs >= 3) finish(false);
+  function advance() {
+    P.next++;
+    if (P.next % nTiles() === 0) {
+      if (P.play) {
+        // round complete: a star (then crowns), and the song starts again faster
+        P.lap++;
+        P.banner = { text: P.lap <= 3 ? '★'.repeat(P.lap) : '👑 ' + (P.lap - 3), t: 1.6 };
+        Sound.play('star');
+        P.beat = Math.max(P.beat, tileBeat(P.next) - 1.5);
+      } else finish();
+    }
   }
   function key(ch, tapCol) {
     if (!P || P.over || P.paused) return;
@@ -357,55 +412,55 @@ const Piano = (() => {
     const col = tapCol != null ? tapCol : P.keys.indexOf(ch);
     if (col < 0 && !/^[a-z;]$/.test(ch)) return;
     PianoAudio.ctx();
-    if (!P.started) {
-      // the first correct key starts the music on the first tile (it never costs a life)
-      if (col !== P.cols[0]) return;
-      P.started = true; P.beat = P.song.ev[0][0];
-    }
     if (col >= 0) { P.pressed[col] = 0.15; pressKeyRow(col); }
-    const ev = P.song.ev, i = P.next;
-    if (i >= ev.length) return;
-    const e = ev[i];
-    const early = (e[0] - P.beat) * secPerBeat();
-    if (col === P.cols[i] && early >= 1.4) return;   // right key, just a little early: no penalty
-    if (col === P.cols[i]) {
-      // correct key: play the next note or chord of the piece
-      PianoAudio.chord(e.slice(2), e[1] * secPerBeat());
+    const k = P.next;
+    if (!P.started) {
+      // like music tiles: the first tile waits at the bottom; pressing it starts the piece
+      if (col !== tileCol(0)) return;
+      P.started = true; P.beat = tileBeat(0);
+    }
+    const e = tileEv(k);
+    const early = (tileBeat(k) - P.beat) * secPerBeat();
+    if (col === tileCol(k)) {
+      if (early > (P.play ? 2.2 : 1.4)) return;           // right key, far too early: ignored, no penalty
+      PianoAudio.chord(e.slice(2), Math.min(e[1], 2) * secPerBeat());
       const err = Math.abs(early);
       const q = err < 0.09 ? 1 : err < 0.2 ? 0.8 : 0.6;
-      if (q === 1) P.perfect++;
       P.hits++; P.combo++; P.bestCombo = Math.max(P.bestCombo, P.combo);
-      P.score += Math.round(100 * q * (1 + Math.min(P.combo, 100) / 50));
+      P.score += 1;   // like music tiles: one point per tile, so scores stay small and easy to remember
       P.pops.push({ col, t: 0.4, q });
-      if (early > 0) P.beat = e[0];  // early hits pull the song forward
-      P.next++;
+      // the music keeps its own steady speed: hitting early never pulls the tiles faster
+      advance();
       hud();
-      if (P.next >= ev.length) finish(true);
     } else {
-      // wrong key: red flash and a wrong note
-      P.wrongs++;
-      P.combo = 0;
+      P.wrongs++; P.combo = 0;
       PianoAudio.wrong();
-      P.flashes.push({ col: col >= 0 ? col : P.cols[i], t: 0.35, red: true });
+      P.flashes.push({ col: col >= 0 ? col : tileCol(k), t: 0.45 });
       hud();
-      if (!P.practice && P.misses + P.wrongs >= 3) finish(false);
+      if (!P.practice && P.misses + P.wrongs >= lives()) finish();
     }
   }
   function accuracy() { const n = P.hits + P.misses + P.wrongs; return n ? P.hits / n * 100 : 100; }
-  function finish(done) {
+  function finish() {
     if (P.over) return;
     P.over = true;
-    const profile = U.profile(), d = data(profile), s = P.song;
+    const profile = U.profile(), all = data(profile), md = modeData(profile), s = P.song;
     const acc = accuracy();
-    let stars = 0;
-    if (done) { stars = 1; if (acc >= 90) stars = 2; if (acc >= 97 && P.misses === 0) stars = 3; }
-    let coins = done ? stars * 15 + Math.floor(P.hits / 10) : Math.floor(P.hits / 20);
+    let stars, done;
+    if (P.play) { stars = P.lap; done = P.lap > 0; }
+    else {
+      done = P.next >= nTiles();
+      stars = 0;
+      if (done) { stars = 1; if (acc >= 90) stars = 2; if (acc >= 97 && P.misses === 0) stars = 3; }
+    }
+    let coins = P.play ? Math.min(3, stars) * 15 + Math.max(0, stars - 3) * 10 + Math.floor(P.hits / 10)
+      : (done ? stars * 15 + Math.floor(P.hits / 10) : Math.floor(P.hits / 20));
     if (P.practice) coins = Math.floor(coins / 2);
-    const r = d.songs[s.id] || { stars: 0, best: 0, bestAcc: 0, plays: 0, done: false };
+    const r = md.songs[s.id] || { stars: 0, best: 0, bestAcc: 0, plays: 0, done: false };
     const firstDone = done && !r.done;
-    r.plays++; r.stars = Math.max(r.stars, stars); r.best = Math.max(r.best, P.score); r.bestAcc = Math.max(r.bestAcc, Math.round(acc));
+    r.plays++; r.stars = Math.max(r.stars || 0, stars); r.top = Math.max(r.top || 0, P.score);   // 'top' replaces the old, much bigger 'best' scores r.bestAcc = Math.max(r.bestAcc || 0, Math.round(acc));
     if (done) r.done = true;
-    d.songs[s.id] = r; d.plays++; d.notes += P.hits; d.best = Math.max(d.best, P.score);
+    md.songs[s.id] = r; all.plays++; all.notes += P.hits; all.top = Math.max(all.top || 0, P.score);
     profile.coins += coins;
     Store.save();
     Sound.play(done ? 'win' : 'lose');
@@ -413,19 +468,19 @@ const Piano = (() => {
     setTimeout(() => { if (P && P.song === s) results(res); }, 900);
   }
   function results(r) {
-    const s = P.song, list = songs();
-    const nextIdx = P.index + 1;
-    const hasNext = r.done && nextIdx < list.length;
+    const s = P.song, list = songs(), nextIdx = P.index + 1;
+    const hasNext = nextIdx < list.length && (P.play ? playStars(U.profile()) >= levelNeed(Math.floor(nextIdx / PER_LEVEL)) : r.done);
+    const shownStars = Math.min(3, r.stars), crowns = Math.max(0, r.stars - 3);
     U.openModal(
-      U.h('h2', { class: r.done ? 'win' : 'lose' }, r.done ? t('songComplete') : t('songOver')),
-      U.h('div', { class: 'res-stars' }, [0, 1, 2].map(i => U.h('span', { class: i < r.stars ? 'on' : '', style: `animation-delay:${0.2 + i * 0.25}s` }, '★'))),
+      U.h('h2', { class: r.done ? 'win' : 'lose' }, P.play ? (r.stars ? t('roundsDone', r.stars) : t('songOver')) : (r.done ? t('songComplete') : t('songOver'))),
+      U.h('p', { class: 'center' }, title(s)),
+      U.h('div', { class: 'res-stars' }, [0, 1, 2].map(i => U.h('span', { class: i < shownStars ? 'on' : '', style: `animation-delay:${0.2 + i * 0.25}s` }, '★')), crowns ? U.h('span', { class: 'on crowns' }, '👑' + crowns) : ''),
       U.h('div', { class: 'res-grid' },
         U.h('div', {}, U.h('b', {}, P.score), U.h('small', {}, t('score'))),
         U.h('div', {}, U.h('b', {}, Math.round(r.acc) + '%'), U.h('small', {}, t('accuracy'))),
         U.h('div', {}, U.h('b', {}, P.bestCombo), U.h('small', {}, t('bestCombo'))),
         U.h('div', {}, U.h('b', {}, '+' + r.coins), U.h('small', {}, t('coinsCap')))),
-      U.h('p', { class: 'goal-line' }, `${P.hits} / ${s.ev.length} ${t('notesPlayed')}`),
-      r.firstDone && hasNext ? U.h('p', { class: 'goal-line' }, U.h('span', { class: 'ok' }, '🔓 ' + t('songUnlocked', U.lang() === 'es' ? list[nextIdx].titleEs : list[nextIdx].title))) : '',
+      P.play ? U.h('p', { class: 'goal-line' }, t('playStarsLine')) : U.h('p', { class: 'goal-line' }, `${Math.min(P.hits, nTiles())} / ${nTiles()} ${t('notesPlayed')}`),
       U.h('div', { class: 'row-btns' },
         U.h('button', { class: 'btn btn-ghost', onclick: () => { U.closeModal(); stop(); openMenu(); } }, t('songs')),
         U.h('button', { class: 'btn btn-ghost', onclick: () => { U.closeModal(); start(P.index); } }, t('retry') + ' ↻'),
@@ -439,74 +494,98 @@ const Piano = (() => {
     const r = canvas.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.max(1, Math.round(r.width * d)); canvas.height = Math.max(1, Math.round(r.height * d));
   }
-  function rr(x, y, w, h, r) { cx.beginPath(); if (cx.roundRect) cx.roundRect(x, y, w, h, r); else cx.rect(x, y, w, h); }
+  function rr(x, y, w, h, r) { cx.beginPath(); if (cx.roundRect) cx.roundRect(x, y, w, h, Math.min(r, h / 2)); else cx.rect(x, y, w, h); }
   function draw() {
     const W = canvas.width, H = canvas.height;
     if (!W || !H) return;
     const d = W / canvas.getBoundingClientRect().width || 1;
     cx.setTransform(1, 0, 0, 1, 0, 0);
+    const hue = 212;
+    // creative backdrop: shifting night-sky gradient, drifting notes, soft aurora
     const g = cx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, '#0d1226'); g.addColorStop(1, '#1b2340');
+    g.addColorStop(0, '#05070d'); g.addColorStop(0.6, `hsl(${hue}, 55%, ${9 + Math.min(P.lap, 4) * 2}%)`); g.addColorStop(1, `hsl(${hue}, 65%, ${17 + Math.min(P.lap, 4) * 2}%)`);
     cx.fillStyle = g; cx.fillRect(0, 0, W, H);
-    const n = P.keys.length;
-    const laneW = Math.min(W / n, (P.tap ? 190 : 150) * d), x0 = (W - laneW * n) / 2;
-    P.lane = { x0: x0 / d, w: laneW / d };
-    const hitY = H - 34 * d;
-    const tileH = Math.max(46 * d, Math.min(H * 0.16, 110 * d));
-    const pxPerBeat = Math.max(tileH * 1.25 / Math.max(P.medGap, 0.0625), H * 0.12);
-    // lanes
-    for (let c = 0; c < n; c++) {
-      cx.fillStyle = c % 2 ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.045)';
-      cx.fillRect(x0 + c * laneW, 0, laneW, H);
-      if (P.pressed[c] > 0) { cx.fillStyle = 'rgba(120,200,255,0.12)'; cx.fillRect(x0 + c * laneW, 0, laneW, H); P.pressed[c] -= 1 / 60; }
+    for (let k = 0; k < 3; k++) {
+      const ay = H * (0.18 + k * 0.17) + Math.sin(P.t * 0.4 + k) * 20 * d;
+      const ag = cx.createLinearGradient(0, ay - 60 * d, 0, ay + 60 * d);
+      ag.addColorStop(0, 'rgba(0,0,0,0)'); ag.addColorStop(0.5, `hsla(${hue + k * 6}, 90%, 60%, 0.07)`); ag.addColorStop(1, 'rgba(0,0,0,0)');
+      cx.fillStyle = ag; cx.fillRect(0, ay - 60 * d, W, 120 * d);
     }
-    cx.strokeStyle = 'rgba(255,255,255,0.08)'; cx.lineWidth = 1 * d;
+    cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    P.notes.forEach(n => {
+      cx.fillStyle = `hsla(${hue}, ${n.c === 1 ? 0 : 90}%, ${75 + n.c * 8}%, ${0.12 + 0.1 * n.s})`;
+      cx.font = `${Math.round((14 + n.s * 14) * d)}px serif`;
+      cx.fillText(n.c === 0 ? '♪' : n.c === 1 ? '♫' : '♩', n.x * W, n.y * H);
+    });
+    const n = P.keys.length;
+    const laneW = Math.min(W / n, (P.play ? 190 : 150) * d), x0 = (W - laneW * n) / 2;
+    P.lane = { x0: x0 / d, w: laneW / d };
+    const hitY = H - 26 * d;
+    const base = Math.max(54 * d, Math.min(H * 0.17, 120 * d));        // height of a tile of median length
+    const pxPerBeat = base / Math.max(P.medGap, 0.0625);
+    for (let c = 0; c < n; c++) {
+      cx.fillStyle = c % 2 ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.055)';
+      cx.fillRect(x0 + c * laneW, 0, laneW, H);
+      if (P.pressed[c] > 0) { cx.fillStyle = `hsla(${hue}, 90%, 70%, 0.14)`; cx.fillRect(x0 + c * laneW, 0, laneW, H); P.pressed[c] -= 1 / 60; }
+    }
+    cx.strokeStyle = 'rgba(255,255,255,0.1)'; cx.lineWidth = 1 * d;
     for (let c = 1; c < n; c++) { cx.beginPath(); cx.moveTo(x0 + c * laneW, 0); cx.lineTo(x0 + c * laneW, H); cx.stroke(); }
     // hit line
-    cx.fillStyle = 'rgba(255,213,79,0.18)'; cx.fillRect(x0, hitY - tileH, laneW * n, tileH);
-    cx.strokeStyle = '#ffd54f'; cx.lineWidth = 3 * d; cx.shadowColor = '#ffd54f'; cx.shadowBlur = 12 * d;
+    cx.strokeStyle = '#8fd3ff'; cx.lineWidth = 3 * d; cx.shadowColor = cx.strokeStyle; cx.shadowBlur = 14 * d;
     cx.beginPath(); cx.moveTo(x0, hitY); cx.lineTo(x0 + laneW * n, hitY); cx.stroke();
     cx.shadowBlur = 0;
-    // tiles
-    const ev = P.song.ev;
-    const font = `700 ${Math.round(Math.min(laneW, tileH) * 0.36)}px Fredoka, system-ui, sans-serif`;
-    for (let i = Math.max(0, P.next - 3); i < ev.length; i++) {
-      const y = hitY - (ev[i][0] - P.beat) * pxPerBeat;
-      if (y < -10) break;
-      if (y - tileH > H) continue;
-      const c = P.cols[i], x = x0 + c * laneW + 4 * d, w = laneW - 8 * d;
-      const done = i < P.next;
-      if (done) continue;
-      const isNext = i === P.next;
-      if (isNext) { cx.shadowColor = '#7fe3ff'; cx.shadowBlur = 22 * d; }
-      rr(x, y - tileH, w, tileH - 4 * d, 12 * d);
-      const tg = cx.createLinearGradient(0, y - tileH, 0, y);
-      tg.addColorStop(0, isNext ? '#ffffff' : '#e9eefb'); tg.addColorStop(1, isNext ? '#c9f3ff' : '#c7d0e6');
+    // tiles: each tile is as tall as the time until the next note, so tiles never overlap
+    const font = `700 ${Math.round(Math.min(laneW, base) * 0.34)}px Fredoka, system-ui, sans-serif`;
+    const limit = P.play ? P.next + 80 : nTiles();
+    for (let k = P.next; k < limit; k++) {
+      const yb = hitY - (tileBeat(k) - P.beat) * pxPerBeat;      // bottom of the tile
+      if (yb < -10) break;
+      const nextB = (P.play || k + 1 < nTiles()) ? tileBeat(k + 1) : tileBeat(k) + tileEv(k)[1];
+      const h = Math.max(16 * d, Math.min(base * 2.4, (nextB - tileBeat(k)) * pxPerBeat - 4 * d));
+      const c = tileCol(k), x = x0 + c * laneW + 4 * d, w = laneW - 8 * d;
+      const isNext = k === P.next;
+      const lh = hue;
+      if (isNext) { cx.shadowColor = `hsl(${lh}, 100%, 70%)`; cx.shadowBlur = 24 * d; }
+      rr(x, yb - h, w, h, 12 * d);
+      const tg = cx.createLinearGradient(0, yb - h, 0, yb);
+      if (P.play) { tg.addColorStop(0, isNext ? '#4aa3ff' : '#1c2433'); tg.addColorStop(1, isNext ? '#1565c0' : '#05070d'); }
+      else { tg.addColorStop(0, isNext ? '#ffffff' : '#e9eefb'); tg.addColorStop(1, isNext ? '#c9f3ff' : '#c7d0e6'); }
       cx.fillStyle = tg; cx.fill();
       cx.shadowBlur = 0;
-      cx.lineWidth = 3 * d; cx.strokeStyle = isNext ? '#29b6f6' : '#1e2536'; cx.stroke();
-      if (ev[i].length > 3) { cx.fillStyle = 'rgba(41,182,246,0.35)'; rr(x + 6 * d, y - 14 * d, w - 12 * d, 6 * d, 3 * d); cx.fill(); }
-      cx.fillStyle = '#1e2536'; cx.font = font; cx.textAlign = 'center'; cx.textBaseline = 'middle';
-      cx.fillText(P.tap ? '♪' : P.keys[c].toUpperCase(), x + w / 2, y - tileH / 2 - 2 * d);
+      cx.lineWidth = 3 * d; cx.strokeStyle = isNext ? '#ffffff' : (P.play ? 'rgba(143,211,255,0.55)' : '#1e2536'); cx.stroke();
+      if (tileEv(k).length > 3 && h > 26 * d) { cx.fillStyle = 'rgba(255,255,255,0.45)'; rr(x + 8 * d, yb - 12 * d, w - 16 * d, 5 * d, 3 * d); cx.fill(); }
+      if (h > 22 * d) {
+        cx.fillStyle = P.play ? '#ffffff' : '#1e2536'; cx.font = font;
+        const label = !P.started && k === 0 ? (P.play ? t('tapStart') : P.keys[c].toUpperCase() + ' ▶') : (P.play ? '' : P.keys[c].toUpperCase());
+        if (label) cx.fillText(label, x + w / 2, yb - Math.min(h, base) / 2);
+      }
     }
     // hit pops & red flashes
     P.pops.forEach(p => {
       const a = p.t / 0.4, x = x0 + p.col * laneW + laneW / 2;
-      cx.globalAlpha = a; cx.fillStyle = p.q === 1 ? '#7fe3ff' : '#b2ff9e';
-      cx.beginPath(); cx.arc(x, hitY - tileH / 2, laneW * 0.25 + (1 - a) * laneW * 0.35, 0, Math.PI * 2); cx.fill();
+      cx.globalAlpha = a; cx.strokeStyle = p.q === 1 ? '#8fd3ff' : '#ffffff'; cx.lineWidth = 4 * d;
+      cx.beginPath(); cx.arc(x, hitY - base / 2, laneW * 0.2 + (1 - a) * laneW * 0.4, 0, Math.PI * 2); cx.stroke();
       cx.globalAlpha = 1;
     });
     P.flashes.forEach(f => {
-      if (f.col == null) return;
-      cx.globalAlpha = Math.min(1, f.t / 0.2); cx.fillStyle = '#ff5252';
-      rr(x0 + f.col * laneW + 4 * d, hitY - tileH, laneW - 8 * d, tileH - 4 * d, 12 * d); cx.fill();
+      const col = f.k != null ? tileCol(f.k) : f.col;
+      cx.globalAlpha = Math.min(1, f.t / 0.2); cx.fillStyle = '#ff4d5e';
+      rr(x0 + col * laneW + 4 * d, hitY - base, laneW - 8 * d, base - 4 * d, 12 * d); cx.fill();
       cx.globalAlpha = 1;
     });
-    if (!P.started) {
-      cx.fillStyle = 'rgba(30,37,54,0.85)'; const bw = Math.min(W - 20 * d, 420 * d);
-      rr(W / 2 - bw / 2, H * 0.36, bw, 54 * d, 27 * d); cx.fill();
-      cx.fillStyle = '#fff'; cx.font = `600 ${Math.round(19 * d)}px Fredoka, system-ui, sans-serif`; cx.textAlign = 'center'; cx.textBaseline = 'middle';
-      cx.fillText(P.loaded ? (P.tap ? t('pianoTapToStart') : t('pianoPressToStart', P.keys[P.cols[0]].toUpperCase())) : t('loadingPiano'), W / 2, H * 0.36 + 27 * d);
+    if (P.banner) {
+      cx.globalAlpha = Math.min(1, P.banner.t);
+      cx.fillStyle = '#8fd3ff'; cx.font = `700 ${Math.round(46 * d)}px Fredoka, system-ui, sans-serif`;
+      cx.fillText(P.banner.text, W / 2, H * 0.35);
+      cx.font = `600 ${Math.round(18 * d)}px Fredoka, system-ui, sans-serif`; cx.fillStyle = '#fff';
+      cx.fillText(t('fasterNow'), W / 2, H * 0.35 + 40 * d);
+      cx.globalAlpha = 1;
+    }
+    if (!P.loaded && !P.started) {
+      cx.fillStyle = 'rgba(30,37,54,0.85)'; const bw = Math.min(W - 20 * d, 300 * d);
+      rr(W / 2 - bw / 2, H * 0.3, bw, 44 * d, 22 * d); cx.fill();
+      cx.fillStyle = '#fff'; cx.font = `600 ${Math.round(17 * d)}px Fredoka, system-ui, sans-serif`;
+      cx.fillText(t('loadingPiano'), W / 2, H * 0.3 + 22 * d);
     }
   }
   function buildKeyRow() {
@@ -520,11 +599,12 @@ const Piano = (() => {
   function hud() {
     if (!P) return;
     $('pp-score').textContent = P.score;
-    $('pp-combo').textContent = P.combo > 1 ? t('combo') + ' x' + P.combo : '';
-    const lives = P.practice ? '' : '♥'.repeat(Math.max(0, 3 - P.misses - P.wrongs)) + '♡'.repeat(Math.min(3, P.misses + P.wrongs));
-    $('pp-lives').textContent = P.practice ? t('practice') : lives;
-    $('pp-progress').style.width = (P.next / P.song.ev.length * 100) + '%';
-    const nk = P.next < P.song.ev.length ? P.cols[P.next] : -1;
+    $('pp-combo').textContent = P.combo > 1 ? 'x' + P.combo : '';
+    const L = lives(), lost = Math.min(L, P.misses + P.wrongs);
+    $('pp-lives').textContent = P.practice ? t('practice') : '♥'.repeat(L - lost) + '♡'.repeat(lost);
+    $('pp-progress').style.width = ((P.next % nTiles()) / nTiles() * 100) + '%';
+    $('pp-laps').textContent = P.play ? '★'.repeat(Math.min(3, P.lap)) + '☆'.repeat(Math.max(0, 3 - P.lap)) + (P.lap > 3 ? ' 👑' + (P.lap - 3) : '') : '';
+    const nk = tileCol(P.next);
     document.querySelectorAll('#pp-keys .pp-key').forEach(el => el.classList.toggle('next', +el.dataset.c === nk));
   }
   function focusInput() { const i = $('piano-input'); i.value = ''; try { i.focus({ preventScroll: true }); } catch (e) { i.focus(); } }
@@ -535,7 +615,7 @@ const Piano = (() => {
       U.h('div', { class: 'row-btns', style: 'justify-content:center' },
         U.h('button', { class: 'btn btn-ghost', onclick: () => { U.closeModal(); stop(); openMenu(); } }, t('songs')),
         U.h('button', { class: 'btn btn-ghost', onclick: () => { U.closeModal(); start(P.index); } }, t('restart')),
-        U.h('button', { class: 'btn btn-gold', onclick: () => { U.closeModal(); P.paused = false; if (P.phone && !P.tap) focusInput(); } }, t('resume') + ' ▶')));
+        U.h('button', { class: 'btn btn-gold', onclick: () => { U.closeModal(); P.paused = false; if (P.phone && !P.play) focusInput(); } }, t('resume') + ' ▶')));
   }
 
   function init(helpers) {
@@ -546,13 +626,13 @@ const Piano = (() => {
       if (!$('modal').classList.contains('hidden')) return;
       if (e.key === 'Escape') { pause(); return; }
       if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
-      if (e.key.length === 1) { e.preventDefault(); key(e.key); }
+      if (e.key.length === 1 && P && !P.play) { e.preventDefault(); key(e.key); }
     });
     const inp = $('piano-input');
     inp.addEventListener('input', () => { const v = inp.value; inp.value = ''; if ($('modal').classList.contains('hidden')) for (const ch of v) key(ch); });
     $('pp-stage').addEventListener('pointerdown', e => {
       if (!P || e.target.closest('button')) return;
-      if (P.tap) {
+      if (P.play) {
         e.preventDefault();
         if (!$('modal').classList.contains('hidden') || !P.lane) return;
         const r = canvas.getBoundingClientRect();
@@ -563,8 +643,11 @@ const Piano = (() => {
       if (P.phone) focusInput();
     });
     $('btn-pp-pause').addEventListener('click', pause);
-    $('btn-pm-back').addEventListener('click', () => U.back());
+    $('btn-pm-back').addEventListener('click', openHome);
+    $('btn-ph-back').addEventListener('click', () => U.back());
+    $('btn-ph-play').addEventListener('click', () => openMenu('play'));
+    $('btn-ph-learn').addEventListener('click', () => openMenu('learn'));
     window.addEventListener('resize', () => { if (U.screen() === 'scr-piano') resize(); });
   }
-  return { init, openMenu, stop, resize, data, unlockedIdx, songs, sheetMusic, state: () => P };
+  return { init, openHome, openMenu, stop, resize, data, songs, sheetMusic, playStars, state: () => P };
 })();
