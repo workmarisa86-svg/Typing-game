@@ -74,7 +74,22 @@ const PianoAudio = (() => {
     pitches.forEach((p, i) => play(p, dur, i === 0 ? v + 0.1 : v * 0.8));
   }
   function wrong() { play(40, 0.18, 0.7); play(41, 0.18, 0.7); play(46, 0.18, 0.5); }
-  return { ctx, setVolume, preload, play, chord, wrong, sampleFor };
+  // applause: many short noise bursts through a band-pass filter, fading out
+  function clap(sec = 2.4) {
+    const a = ctx(); if (!a) return;
+    const len = Math.floor(a.sampleRate * 0.035);
+    const buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+    const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 0.8; bp.connect(master);
+    const t0 = a.currentTime;
+    for (let i = 0; i < sec * 50; i++) {
+      const tt = Math.random() * sec, s = a.createBufferSource(), g = a.createGain();
+      s.buffer = buf; s.playbackRate.value = 0.75 + Math.random() * 0.6;
+      g.gain.value = (0.3 + Math.random() * 0.4) * Math.min(1, (1 - tt / sec) * 1.8 + 0.08);
+      s.connect(g); g.connect(bp); s.start(t0 + tt);
+    }
+  }
+  return { ctx, setVolume, preload, play, chord, wrong, clap, sampleFor };
 })();
 
 // ---------- the mode ----------
@@ -91,6 +106,8 @@ const Piano = (() => {
   const STARS_PER_LEVEL = 5;    // stars needed to open each next level
   const LAP_SPEEDUP = 1.15;     // Play mode: every completed round is 15% faster
   const DIFF_HUE = { beginner: 198, easy: 204, medium: 210, hard: 216, expert: 222 };   // blues only
+  const ROW_SPEED = { beginner: 1.9, easy: 2.1, medium: 2.3, hard: 2.5, expert: 2.7 };   // Play mode: tile rows per second in round 1
+  const CONFETTI = ['#ffffff', '#8fd3ff', '#4aa3ff', '#1565c0'];
   let U = null, P = null, raf = 0, canvas, cx, mode = 'play';
 
   function songs() { return window.PIANO_SONGS || []; }
@@ -335,6 +352,7 @@ const Piano = (() => {
       medGap, t: 0, loaded: false, lap: 0, lapLen: last[0] + Math.max(last[1], medGap) + 2, banner: null,
       notes: Array.from({ length: 22 }, (_, k) => ({ x: Math.random(), y: Math.random(), s: 0.5 + Math.random(), c: k % 3 }))
     };
+    if (play) setupRows();
     document.body.classList.toggle('phone', phone);
     U.show('scr-piano'); U.applyStatic();
     $('scr-piano').classList.toggle('tap', play);
@@ -358,6 +376,86 @@ const Piano = (() => {
     };
     raf = requestAnimationFrame(loop);
     hud();
+  }
+  // Play mode (music tiles): every tile is one row tall, long notes are taller hold tiles,
+  // and two tiles in a row never share a lane
+  function setupRows() {
+    const ev = P.song.ev, n = ev.length, L = P.keys.length, c = P.cols;
+    P.rowOf = []; P.rowLen = [];
+    let row = 0;
+    for (let i = 0; i < n; i++) {
+      const gap = i + 1 < n ? ev[i + 1][0] - ev[i][0] : Math.max(ev[i][1], P.medGap);
+      const ratio = gap / P.medGap;
+      const len = ratio >= 1.9 ? Math.min(4, Math.max(2, Math.round(ratio / 1.5))) : 1;
+      P.rowOf.push(row); P.rowLen.push(len); row += len;
+    }
+    P.lapRows = row;
+    for (let i = 1; i < n; i++) {
+      if (c[i] !== c[i - 1]) continue;
+      const dir = ev[i][2] > ev[i - 1][2] ? 1 : ev[i][2] < ev[i - 1][2] ? -1 : (c[i - 1] < L / 2 ? 1 : -1);
+      let nc = c[i - 1] + dir;
+      if (nc < 0 || nc >= L) nc = c[i - 1] - dir;
+      c[i] = nc;
+    }
+    // the last tile also differs from the first one of the next round
+    if (n > 2 && c[n - 1] === c[0]) {
+      for (const dlt of [1, -1, 2, -2, 3, -3]) { const nc = c[n - 1] + dlt; if (nc >= 0 && nc < L && nc !== c[n - 2] && nc !== c[0]) { c[n - 1] = nc; break; } }
+    }
+    Object.assign(P, { row: 0, lapStartK: 0, hold: null, fill: {}, roundPending: 0, celebrate: null, confetti: [] });
+  }
+  const rowLenK = k => P.rowLen[k % nTiles()];
+  const rowStart = k => P.rowOf[k % nTiles()] + Math.floor(k / nTiles()) * P.lapRows;
+  const rowSpeed = () => ROW_SPEED[P.song.diff] * Math.pow(LAP_SPEEDUP, P.lap);
+  function playTap(pid) {
+    if (!P || P.over || P.paused) return;
+    PianoAudio.ctx();
+    const k = P.next, col = tileCol(k), len = rowLenK(k), e = tileEv(k);
+    P.pressed[col] = 0.15;
+    P.started = true;
+    PianoAudio.chord(e.slice(2), Math.min(2.5, len / rowSpeed() + 0.15));
+    P.hits++; P.combo++; P.bestCombo = Math.max(P.bestCombo, P.combo);
+    P.score += 1;
+    P.pops.push({ col, t: 0.4, q: 1 });
+    P.fill[k] = len > 1 ? 0 : 1;
+    if (len > 1) P.hold = { k, pid, h0: Math.min(P.row, rowStart(k)), got: 0 };
+    P.next++;
+    if (P.next % nTiles() === 0) P.roundPending = 0.35;
+    hud();
+  }
+  function release(pid) { if (P && P.hold && (pid == null || P.hold.pid === pid)) P.hold = null; }
+  function playUpdate(dt) {
+    P.confetti = P.confetti.filter(c => { c.vy += 0.45 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.rot += c.vr * dt; return c.y < 1.2; });
+    if (P.celebrate) {
+      // clapping break between rounds: the screen is clear, then the next round waits for START
+      P.celebrate.t -= dt;
+      if (P.celebrate.t <= 0) { P.celebrate = null; P.lapStartK = P.next; P.row = rowStart(P.next); P.started = false; P.fill = {}; hud(); }
+      return;
+    }
+    if (!P.started || P.over) return;
+    P.row += dt * rowSpeed();
+    if (P.hold) {
+      const h = P.hold, len = rowLenK(h.k), p = Math.min(1, (P.row - h.h0) / len);
+      P.fill[h.k] = Math.max(P.fill[h.k] || 0, p);
+      const earned = Math.floor(p * len + 1e-6);   // keep holding: +1 for every row the fill climbs
+      if (earned > h.got) { P.score += earned - h.got; h.got = earned; P.pops.push({ col: tileCol(h.k), t: 0.4, q: 1, plus: true }); hud(); }
+      if (p >= 1) P.hold = null;
+    }
+    if (P.roundPending) {
+      if (!P.hold) P.roundPending -= dt;
+      if (P.roundPending <= 0) {
+        P.roundPending = 0; P.hold = null; P.lap++;
+        P.celebrate = { t: 2.8 };
+        Sound.play('star'); PianoAudio.clap();
+        for (let i = 0; i < 90; i++) P.confetti.push({ x: Math.random(), y: Math.random() * 0.45, vx: (Math.random() - 0.5) * 0.3, vy: -0.1 - Math.random() * 0.35, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 10, c: CONFETTI[i % 4] });
+        hud();
+      }
+      return;
+    }
+    if (P.row - rowStart(P.next) > 0.3) {   // a tile slid past the line: the song ends (one life)
+      P.flashes.push({ k: P.next, t: 0.6 });
+      P.misses++; P.combo = 0; PianoAudio.wrong();
+      hud(); finish();
+    }
   }
   function stop() { cancelAnimationFrame(raf); if (P) Sound.pauseMusic(false); P = null; }
 
@@ -384,6 +482,7 @@ const Piano = (() => {
     P.flashes = P.flashes.filter(f => (f.t -= dt) > 0);
     P.pops = P.pops.filter(f => (f.t -= dt) > 0);
     if (P.banner) { P.banner.t -= dt; if (P.banner.t <= 0) P.banner = null; }
+    if (P.play) { playUpdate(dt); return; }
     if (!P.started || P.over) return;
     const nb = (!P.play && P.next >= nTiles()) ? Infinity : tileBeat(P.next);
     let adv = dt / secPerBeat();
@@ -445,11 +544,11 @@ const Piano = (() => {
     }
   }
   // Play mode: tapping empty space (or the wrong tile) is a mistake
-  function missTap(col) {
+  function missTap(col, y) {
     if (!P || P.over || P.paused) return;
-    P.wrongs++; P.combo = 0;
+    P.wrongs++; P.combo = 0; P.hold = null;
     PianoAudio.wrong();
-    P.flashes.push({ col, t: 0.45 });
+    P.flashes.push({ col, y, t: 0.6 });
     hud();
     if (P.misses + P.wrongs >= lives()) finish();
   }
@@ -534,7 +633,8 @@ const Piano = (() => {
     const laneW = Math.min(W / n, (P.play ? 190 : 150) * d), x0 = (W - laneW * n) / 2;
     P.lane = { x0: x0 / d, w: laneW / d };
     const hitY = H - 26 * d;
-    const base = Math.max(54 * d, Math.min(H * 0.17, 120 * d));        // height of a tile of median length
+    const base = P.play ? Math.max(H / 4.2, 88 * d)                    // Play mode: big music-tiles rows
+      : Math.max(54 * d, Math.min(H * 0.17, 120 * d));                  // height of a tile of median length
     const pxPerBeat = base / Math.max(P.medGap, 0.0625);
     P.ppb = pxPerBeat / d; P.hcss = H / d; P.nextRect = null;
     for (let c = 0; c < n; c++) {
@@ -550,8 +650,8 @@ const Piano = (() => {
     cx.shadowBlur = 0;
     // tiles: each tile is as tall as the time until the next note, so tiles never overlap
     const font = `700 ${Math.round(Math.min(laneW, base) * 0.34)}px Fredoka, system-ui, sans-serif`;
-    const limit = P.play ? P.next + 80 : nTiles();
-    for (let k = P.next; k < limit; k++) {
+    if (P.play) drawRows(W, H, d, x0, laneW, hitY, base);
+    for (let k = P.next; !P.play && k < nTiles(); k++) {
       const yb = hitY - (tileBeat(k) - P.beat) * pxPerBeat;      // bottom of the tile
       if (yb < -10) break;
       const nextB = (P.play || k + 1 < nTiles()) ? tileBeat(k + 1) : tileBeat(k) + tileEv(k)[1];
@@ -578,6 +678,11 @@ const Piano = (() => {
     // hit pops & red flashes
     P.pops.forEach(p => {
       const a = p.t / 0.4, x = x0 + p.col * laneW + laneW / 2;
+      if (p.plus) {
+        cx.globalAlpha = a; cx.fillStyle = '#8fd3ff'; cx.font = `700 ${Math.round(26 * d)}px Fredoka, system-ui, sans-serif`;
+        cx.fillText('+1', x, hitY - base * 0.6 - (1 - a) * 50 * d); cx.globalAlpha = 1;
+        return;
+      }
       cx.globalAlpha = a; cx.strokeStyle = p.q === 1 ? '#8fd3ff' : '#ffffff'; cx.lineWidth = 4 * d;
       cx.beginPath(); cx.arc(x, hitY - base / 2, laneW * 0.2 + (1 - a) * laneW * 0.4, 0, Math.PI * 2); cx.stroke();
       cx.globalAlpha = 1;
@@ -585,7 +690,10 @@ const Piano = (() => {
     P.flashes.forEach(f => {
       const col = f.k != null ? tileCol(f.k) : f.col;
       cx.globalAlpha = Math.min(1, f.t / 0.2); cx.fillStyle = '#ff4d5e';
-      rr(x0 + col * laneW + 4 * d, hitY - base, laneW - 8 * d, base - 4 * d, 12 * d); cx.fill();
+      if (P.play && f.k != null) { const fy = hitY - (rowStart(f.k) - P.row) * base, fh = rowLenK(f.k) * base - 3 * d; rr(x0 + col * laneW + 2 * d, fy - fh, laneW - 4 * d, fh, 10 * d); }
+      else if (P.play) rr(x0 + col * laneW + 2 * d, f.y - base / 2, laneW - 4 * d, base - 3 * d, 10 * d);
+      else rr(x0 + col * laneW + 4 * d, hitY - base, laneW - 8 * d, base - 4 * d, 12 * d);
+      cx.fill();
       cx.globalAlpha = 1;
     });
     if (P.banner) {
@@ -596,12 +704,78 @@ const Piano = (() => {
       cx.fillText(t('fasterNow'), W / 2, H * 0.35 + 40 * d);
       cx.globalAlpha = 1;
     }
+    if (P.play) drawCelebration(W, H, d);
     if (!P.loaded && !P.started) {
       cx.fillStyle = 'rgba(30,37,54,0.85)'; const bw = Math.min(W - 20 * d, 300 * d);
       rr(W / 2 - bw / 2, H * 0.3, bw, 44 * d, 22 * d); cx.fill();
       cx.fillStyle = '#fff'; cx.font = `600 ${Math.round(17 * d)}px Fredoka, system-ui, sans-serif`;
       cx.fillText(t('loadingPiano'), W / 2, H * 0.3 + 22 * d);
     }
+  }
+  // Play mode tiles: one row each, long notes are tall hold tiles that fill up while held
+  function drawRows(W, H, d, x0, laneW, hitY, T) {
+    P.doneRects = [];
+    const font = `700 ${Math.round(Math.min(laneW * 0.21, T * 0.3))}px Fredoka, system-ui, sans-serif`;
+    if (P.celebrate) return;
+    const end = P.lapStartK + nTiles();
+    for (let k = Math.max(P.lapStartK, P.next - 6); k < end; k++) {
+      const len = rowLenK(k), yb = hitY - (rowStart(k) - P.row) * T, h = len * T - 3 * d;
+      if (yb - h > H) continue;
+      if (yb < -10 * d) break;
+      const c = tileCol(k), x = x0 + c * laneW + 2 * d, w = laneW - 4 * d, top = yb - h;
+      const done = k < P.next, isNext = k === P.next, fill = P.fill[k] || 0;
+      if (isNext) P.nextRect = { x: x / d, y: top / d, w: w / d, h: h / d };
+      if (done) P.doneRects.push({ x: x / d, y: top / d, w: w / d, h: h / d });
+      if (isNext) { cx.shadowColor = '#4aa3ff'; cx.shadowBlur = 24 * d; }
+      rr(x, top, w, h, 10 * d);
+      const tg = cx.createLinearGradient(0, top, 0, yb);
+      if (done && len === 1) { tg.addColorStop(0, 'rgba(143,211,255,0.16)'); tg.addColorStop(1, 'rgba(143,211,255,0.06)'); }
+      else { tg.addColorStop(0, isNext ? '#2f86e6' : '#141b28'); tg.addColorStop(1, isNext ? '#0d47a1' : '#05070d'); }
+      cx.fillStyle = tg; cx.fill(); cx.shadowBlur = 0;
+      cx.lineWidth = 2.5 * d; cx.strokeStyle = isNext ? '#ffffff' : 'rgba(143,211,255,0.45)'; cx.stroke();
+      if (len > 1) {
+        // hold tile: a guide line and a dot; the fill climbs from the bottom while held
+        cx.fillStyle = 'rgba(143,211,255,0.5)'; cx.fillRect(x + w / 2 - 2 * d, top + 14 * d, 4 * d, h - 40 * d);
+        if (fill > 0) {
+          const fh = (h - 4 * d) * fill;
+          cx.save(); rr(x + 2 * d, yb - 2 * d - fh, w - 4 * d, fh, 8 * d); cx.clip();
+          const fg = cx.createLinearGradient(0, yb - fh, 0, yb);
+          fg.addColorStop(0, '#ffffff'); fg.addColorStop(1, '#8fd3ff');
+          cx.fillStyle = fg; cx.fillRect(x, yb - fh - 2 * d, w, fh + 2 * d); cx.restore();
+        }
+        cx.fillStyle = fill > 0 ? '#1565c0' : '#ffffff';
+        cx.beginPath(); cx.arc(x + w / 2, yb - 22 * d, 10 * d, 0, Math.PI * 2); cx.fill();
+      }
+      if (isNext) {
+        const label = !P.started ? t('tapStart') : len > 1 ? t('holdTile') : '';
+        if (label) {
+          cx.fillStyle = '#ffffff'; cx.font = font;
+          cx.fillText(label, x + w / 2, len > 1 && P.started ? yb - T * 0.55 : yb - T / 2);
+        }
+      }
+    }
+    if (!P.started && P.lap > 0 && !P.over) {
+      cx.fillStyle = '#ffffff'; cx.font = `700 ${Math.round(24 * d)}px Fredoka, system-ui, sans-serif`;
+      cx.fillText(t('roundNext', P.lap + 1), W / 2, H * 0.22);
+    }
+  }
+  function drawCelebration(W, H, d) {
+    P.confetti.forEach(c => {
+      cx.save(); cx.translate(c.x * W, c.y * H); cx.rotate(c.rot);
+      cx.fillStyle = c.c; cx.fillRect(-5 * d, -3 * d, 10 * d, 6 * d); cx.restore();
+    });
+    if (!P.celebrate) return;
+    const a = Math.min(1, P.celebrate.t / 0.4), bob = Math.sin(P.t * 14) * 6 * d;
+    cx.globalAlpha = a;
+    cx.fillStyle = '#ffffff'; cx.font = `${Math.round(72 * d)}px serif`;
+    cx.fillText('👏', W / 2, H * 0.3 + bob);
+    cx.fillStyle = '#ffffff'; cx.font = `700 ${Math.round(28 * d)}px Fredoka, system-ui, sans-serif`;
+    cx.fillText(t('roundClap', P.lap), W / 2, H * 0.3 + 70 * d);
+    cx.fillStyle = '#8fd3ff'; cx.font = `700 ${Math.round(36 * d)}px Fredoka, system-ui, sans-serif`;
+    cx.fillText(P.lap <= 3 ? '★'.repeat(P.lap) : '👑 ' + (P.lap - 3), W / 2, H * 0.3 + 115 * d);
+    cx.fillStyle = '#ffffff'; cx.font = `600 ${Math.round(20 * d)}px Fredoka, system-ui, sans-serif`;
+    cx.fillText(t('fasterNow'), W / 2, H * 0.3 + 155 * d);
+    cx.globalAlpha = 1;
   }
   function buildKeyRow() {
     const row = $('pp-keys'); row.innerHTML = '';
@@ -617,7 +791,7 @@ const Piano = (() => {
     $('pp-combo').textContent = P.combo > 1 ? 'x' + P.combo : '';
     const L = lives(), lost = Math.min(L, P.misses + P.wrongs);
     $('pp-lives').textContent = P.practice ? t('practice') : '♥'.repeat(L - lost) + '♡'.repeat(lost);
-    $('pp-progress').style.width = ((P.next % nTiles()) / nTiles() * 100) + '%';
+    $('pp-progress').style.width = ((P.play && (P.roundPending || P.celebrate) ? 1 : (P.next % nTiles()) / nTiles()) * 100) + '%';
     $('pp-laps').textContent = P.play ? '★'.repeat(Math.min(3, P.lap)) + '☆'.repeat(Math.max(0, 3 - P.lap)) + (P.lap > 3 ? ' 👑' + (P.lap - 3) : '') : '';
     const nk = tileCol(P.next);
     document.querySelectorAll('#pp-keys .pp-key').forEach(el => el.classList.toggle('next', +el.dataset.c === nk));
@@ -625,7 +799,7 @@ const Piano = (() => {
   function focusInput() { const i = $('piano-input'); i.value = ''; try { i.focus({ preventScroll: true }); } catch (e) { i.focus(); } }
   function pause() {
     if (!P || P.over) return;
-    P.paused = true;
+    P.paused = true; if (P.play) release();
     U.openModal(U.h('h2', {}, t('paused')),
       U.h('div', { class: 'row-btns', style: 'justify-content:center' },
         U.h('button', { class: 'btn btn-ghost', onclick: () => { U.closeModal(); stop(); openMenu(); } }, t('songs')),
@@ -652,15 +826,18 @@ const Piano = (() => {
         if (!$('modal').classList.contains('hidden') || !P.lane) return;
         const r = canvas.getBoundingClientRect();
         const px = e.clientX - r.left, py = e.clientY - r.top, R = P.nextRect, pad = 8;
-        const onTile = R && px >= R.x - pad && px <= R.x + R.w + pad && py >= R.y - pad && py <= R.y + R.h + pad;
-        if (!P.started) { if (onTile) key('', tileCol(0)); return; }   // only the START tile starts the song
-        if (onTile) { key('', tileCol(P.next)); return; }
+        const inR = R => R && px >= R.x - pad && px <= R.x + R.w + pad && py >= R.y - pad && py <= R.y + R.h + pad;
+        if (P.over || P.celebrate || P.roundPending) return;     // between rounds taps do nothing
+        if (inR(R)) { playTap(e.pointerId); return; }
+        if (!P.started) return;                                   // only the START tile starts the round
+        if ((P.doneRects || []).some(inR)) return;                // tiles already played are safe to touch
         const c = Math.floor((px - P.lane.x0) / P.lane.w);
-        missTap(c >= 0 && c < P.keys.length ? c : tileCol(P.next));
+        missTap(c >= 0 && c < P.keys.length ? c : tileCol(P.next), py * (canvas.width / r.width));
         return;
       }
       if (P.phone) focusInput();
     });
+    ['pointerup', 'pointercancel'].forEach(ev => window.addEventListener(ev, e => release(e.pointerId)));
     $('btn-pp-pause').addEventListener('click', pause);
     $('btn-pm-back').addEventListener('click', openHome);
     $('btn-ph-back').addEventListener('click', () => U.back());
