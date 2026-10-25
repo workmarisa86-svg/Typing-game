@@ -90,7 +90,7 @@ const Piano = (() => {
   const PER_LEVEL = 3;          // Play mode: three songs per level
   const STARS_PER_LEVEL = 5;    // stars needed to open each next level
   const LAP_SPEEDUP = 1.15;     // Play mode: every completed round is 15% faster
-  const DIFF_HUE = { beginner: 150, easy: 195, medium: 265, hard: 320, expert: 20 };
+  const DIFF_HUE = { beginner: 198, easy: 204, medium: 210, hard: 216, expert: 222 };   // blues only
   let U = null, P = null, raf = 0, canvas, cx, mode = 'play';
 
   function songs() { return window.PIANO_SONGS || []; }
@@ -156,7 +156,7 @@ const Piano = (() => {
     let nextMarked = false;
     for (let k = 0; k * PER_LEVEL < list.length; k++) {
       const open = have >= levelNeed(k);
-      const hue = (k * 37) % 360;
+      const hue = 198 + (k % 5) * 6;
       body.append(U.h('div', { class: 'pm-level' + (open ? '' : ' locked'), style: `--h:${hue}` },
         U.h('b', {}, t('levelN', k + 1)),
         open ? '' : U.h('span', {}, '🔒 ' + t('needStars', levelNeed(k)))));
@@ -164,7 +164,7 @@ const Piano = (() => {
         const i = k * PER_LEVEL + j, r = d[s.id] || {};
         let cls = '';
         if (open && !r.stars && !nextMarked) { cls = ' next'; nextMarked = true; }
-        body.append(songCard(s, i, r, !open, cls, (hue + j * 14) % 360, () => {
+        body.append(songCard(s, i, r, !open, cls, hue + j * 2, () => {
           if (!open) { Sound.play('nope'); U.toast(t('needStarsToast', levelNeed(k) - have)); return; }
           songIntro(i);
         }));
@@ -186,7 +186,7 @@ const Piano = (() => {
         const locked = !learnOpen(profile, i);
         let cls = '';
         if (!locked && !r.done && !nextMarked) { cls = ' next'; nextMarked = true; }
-        body.append(songCard(s, i, r, locked, cls, (DIFF_HUE[diff] + j * 9) % 360, () => {
+        body.append(songCard(s, i, r, locked, cls, DIFF_HUE[diff] + (j % 3) * 2, () => {
           if (locked) { Sound.play('nope'); U.toast(t('pianoLocked')); return; }
           songIntro(i);
         }));
@@ -499,20 +499,20 @@ const Piano = (() => {
     if (!W || !H) return;
     const d = W / canvas.getBoundingClientRect().width || 1;
     cx.setTransform(1, 0, 0, 1, 0, 0);
-    const hue = DIFF_HUE[P.song.diff] + P.lap * 40;
+    const hue = 212;
     // creative backdrop: shifting night-sky gradient, drifting notes, soft aurora
     const g = cx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, `hsl(${hue + 200}, 45%, 9%)`); g.addColorStop(0.6, `hsl(${hue + 230}, 40%, 14%)`); g.addColorStop(1, `hsl(${hue + 260}, 45%, 20%)`);
+    g.addColorStop(0, '#05070d'); g.addColorStop(0.6, `hsl(${hue}, 55%, ${9 + Math.min(P.lap, 4) * 2}%)`); g.addColorStop(1, `hsl(${hue}, 65%, ${17 + Math.min(P.lap, 4) * 2}%)`);
     cx.fillStyle = g; cx.fillRect(0, 0, W, H);
     for (let k = 0; k < 3; k++) {
       const ay = H * (0.18 + k * 0.17) + Math.sin(P.t * 0.4 + k) * 20 * d;
       const ag = cx.createLinearGradient(0, ay - 60 * d, 0, ay + 60 * d);
-      ag.addColorStop(0, 'rgba(0,0,0,0)'); ag.addColorStop(0.5, `hsla(${hue + k * 50}, 80%, 60%, 0.07)`); ag.addColorStop(1, 'rgba(0,0,0,0)');
+      ag.addColorStop(0, 'rgba(0,0,0,0)'); ag.addColorStop(0.5, `hsla(${hue + k * 6}, 90%, 60%, 0.07)`); ag.addColorStop(1, 'rgba(0,0,0,0)');
       cx.fillStyle = ag; cx.fillRect(0, ay - 60 * d, W, 120 * d);
     }
     cx.textAlign = 'center'; cx.textBaseline = 'middle';
     P.notes.forEach(n => {
-      cx.fillStyle = `hsla(${hue + n.c * 60}, 90%, 75%, ${0.12 + 0.1 * n.s})`;
+      cx.fillStyle = `hsla(${hue}, ${n.c === 1 ? 0 : 90}%, ${75 + n.c * 8}%, ${0.12 + 0.1 * n.s})`;
       cx.font = `${Math.round((14 + n.s * 14) * d)}px serif`;
       cx.fillText(n.c === 0 ? '♪' : n.c === 1 ? '♫' : '♩', n.x * W, n.y * H);
     });
@@ -525,12 +525,12 @@ const Piano = (() => {
     for (let c = 0; c < n; c++) {
       cx.fillStyle = c % 2 ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.055)';
       cx.fillRect(x0 + c * laneW, 0, laneW, H);
-      if (P.pressed[c] > 0) { cx.fillStyle = `hsla(${hue + c * 30}, 90%, 70%, 0.14)`; cx.fillRect(x0 + c * laneW, 0, laneW, H); P.pressed[c] -= 1 / 60; }
+      if (P.pressed[c] > 0) { cx.fillStyle = `hsla(${hue}, 90%, 70%, 0.14)`; cx.fillRect(x0 + c * laneW, 0, laneW, H); P.pressed[c] -= 1 / 60; }
     }
     cx.strokeStyle = 'rgba(255,255,255,0.1)'; cx.lineWidth = 1 * d;
     for (let c = 1; c < n; c++) { cx.beginPath(); cx.moveTo(x0 + c * laneW, 0); cx.lineTo(x0 + c * laneW, H); cx.stroke(); }
     // hit line
-    cx.strokeStyle = `hsl(${hue + 40}, 95%, 65%)`; cx.lineWidth = 3 * d; cx.shadowColor = cx.strokeStyle; cx.shadowBlur = 14 * d;
+    cx.strokeStyle = '#8fd3ff'; cx.lineWidth = 3 * d; cx.shadowColor = cx.strokeStyle; cx.shadowBlur = 14 * d;
     cx.beginPath(); cx.moveTo(x0, hitY); cx.lineTo(x0 + laneW * n, hitY); cx.stroke();
     cx.shadowBlur = 0;
     // tiles: each tile is as tall as the time until the next note, so tiles never overlap
@@ -543,15 +543,15 @@ const Piano = (() => {
       const h = Math.max(16 * d, Math.min(base * 2.4, (nextB - tileBeat(k)) * pxPerBeat - 4 * d));
       const c = tileCol(k), x = x0 + c * laneW + 4 * d, w = laneW - 8 * d;
       const isNext = k === P.next;
-      const lh = hue + c * 35;
+      const lh = hue;
       if (isNext) { cx.shadowColor = `hsl(${lh}, 100%, 70%)`; cx.shadowBlur = 24 * d; }
       rr(x, yb - h, w, h, 12 * d);
       const tg = cx.createLinearGradient(0, yb - h, 0, yb);
-      if (P.play) { tg.addColorStop(0, `hsl(${lh}, 70%, ${isNext ? 62 : 48}%)`); tg.addColorStop(1, `hsl(${lh + 30}, 80%, ${isNext ? 42 : 30}%)`); }
+      if (P.play) { tg.addColorStop(0, isNext ? '#4aa3ff' : '#1c2433'); tg.addColorStop(1, isNext ? '#1565c0' : '#05070d'); }
       else { tg.addColorStop(0, isNext ? '#ffffff' : '#e9eefb'); tg.addColorStop(1, isNext ? '#c9f3ff' : '#c7d0e6'); }
       cx.fillStyle = tg; cx.fill();
       cx.shadowBlur = 0;
-      cx.lineWidth = 3 * d; cx.strokeStyle = isNext ? '#ffffff' : (P.play ? 'rgba(255,255,255,0.35)' : '#1e2536'); cx.stroke();
+      cx.lineWidth = 3 * d; cx.strokeStyle = isNext ? '#ffffff' : (P.play ? 'rgba(143,211,255,0.55)' : '#1e2536'); cx.stroke();
       if (tileEv(k).length > 3 && h > 26 * d) { cx.fillStyle = 'rgba(255,255,255,0.45)'; rr(x + 8 * d, yb - 12 * d, w - 16 * d, 5 * d, 3 * d); cx.fill(); }
       if (h > 22 * d) {
         cx.fillStyle = P.play ? '#ffffff' : '#1e2536'; cx.font = font;
@@ -562,7 +562,7 @@ const Piano = (() => {
     // hit pops & red flashes
     P.pops.forEach(p => {
       const a = p.t / 0.4, x = x0 + p.col * laneW + laneW / 2;
-      cx.globalAlpha = a; cx.strokeStyle = p.q === 1 ? '#7fe3ff' : '#b2ff9e'; cx.lineWidth = 4 * d;
+      cx.globalAlpha = a; cx.strokeStyle = p.q === 1 ? '#8fd3ff' : '#ffffff'; cx.lineWidth = 4 * d;
       cx.beginPath(); cx.arc(x, hitY - base / 2, laneW * 0.2 + (1 - a) * laneW * 0.4, 0, Math.PI * 2); cx.stroke();
       cx.globalAlpha = 1;
     });
@@ -574,7 +574,7 @@ const Piano = (() => {
     });
     if (P.banner) {
       cx.globalAlpha = Math.min(1, P.banner.t);
-      cx.fillStyle = '#ffd54f'; cx.font = `700 ${Math.round(46 * d)}px Fredoka, system-ui, sans-serif`;
+      cx.fillStyle = '#8fd3ff'; cx.font = `700 ${Math.round(46 * d)}px Fredoka, system-ui, sans-serif`;
       cx.fillText(P.banner.text, W / 2, H * 0.35);
       cx.font = `600 ${Math.round(18 * d)}px Fredoka, system-ui, sans-serif`; cx.fillStyle = '#fff';
       cx.fillText(t('fasterNow'), W / 2, H * 0.35 + 40 * d);
