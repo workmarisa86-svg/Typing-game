@@ -502,3 +502,4 @@ button { font-family: inherit; }
   background: rgba(255,255,255,0.06); color: #fff; font: inherit; cursor: pointer; min-width: 92px; }
 .pm-row small { font-family: ui-monospace, monospace; color: #b8d8ee; letter-spacing: 1px; }
 .pm-row.on { background: linear-gradient(#2f86e6, #0d47a1); border-color: #fff; }
+.pm-row small.hint { font-family: inherit; letter-spacing: 0; }
