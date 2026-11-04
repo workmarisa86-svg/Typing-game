@@ -13,6 +13,16 @@ The game uses 21 of those samples (every minor third from C2 to C7, velocity lay
 Notes in between are made by changing the sample's playback speed. The game only loads the samples
 the chosen song needs.
 
+## Orchestra sounds
+
+The strings, choir ("aahs"), oboe, trumpet, timpani and bassoon come from the **FluidR3_GM** soundfont
+by Frank Wen, as rendered to MP3 by https://github.com/gleitz/midi-js-soundfonts
+(commit fetched 2026-11-04). That repository releases them under
+**Creative Commons Attribution 3.0**. The game uses one sample every minor third within each
+instrument's range. Each sample is trimmed to 2.6 seconds with a fade-out and converted to
+mono 48 kbps MP3 with ffmpeg. They live in `audio/orch/<instrument>/` and are loaded only for songs
+that use them.
+
 ## Songs (Piano Challenge)
 
 The melody files are not written by hand. Each piece is read from a public-domain
@@ -54,7 +64,7 @@ are kept in `music/sources/`.
 | Holy, Holy, Holy | John Bacchus Dykes (NICAEA) | holy.mid | Mutopia `DykesJB/nicaea` (Mutopia-2008/02/19-1284) | Public Domain |
 | See the Conquering Hero Comes | Handel (Judas Maccabaeus) | conquering_hero.mid | cellist `Vl, Vlc/…/Tochter Zion` (the hymn "Tochter Zion" uses this chorus melody) | see cellist note above |
 | Largo "Ombra mai fù" | Handel (Serse) | ombra.mid | cellist `Vl, Vl, Vlc, Kl/…/Ombra mai fu` | see cellist note |
-| Hallelujah Chorus (melody) | Handel (Messiah) | hallelujah.mid | Mutopia `HandelGF/hallelujah` soprano part (Mutopia-2015/01/17-459) | Public Domain |
+| Hallelujah Chorus (full score: you play the soprano part, the orchestra and the other voices play by themselves) | Handel (Messiah) | hallelujah_full.mid (compiled from `combined-score.ly`; the voices use the choir sound) | Mutopia `HandelGF/hallelujah` soprano part (Mutopia-2015/01/17-459) | Public Domain |
 | Sheep May Safely Graze (melody) | J. S. Bach, BWV 208 | sheep.mid | Mutopia `BachJS/BWV208/Sheep` (Mutopia-2011/10/25-1794) | Public Domain |
 | Sleepers, Wake! (chorale) | J. S. Bach, BWV 140/7 | bwv140.7.mxl | music21 corpus (`bach/bwv140.7.mxl`, music21 package on PyPI) | Public Domain |
 | Jesu, Joy of Man's Desiring | J. S. Bach, BWV 147 | jesu_joy.mid | cellist `Ob, Eh, Vl, Vlc/…/Jesu bleibet meine Freude` | see cellist note |
@@ -121,6 +131,29 @@ are kept in `music/sources/`.
 The 🎼 sheet music under each song is drawn by the game from the same notes the song plays
 (`js/piano.js`, `sheetMusic`), together with the time and key signature read from the source file. It is a
 simplified score: no beams or rests, and on harder levels each chord uses the top note's length.
+
+## Messiah, HWV 56 (other movements)
+
+These come from the Mutopia edition of the complete *Messiah* by Nicolas Sceaux
+(Mutopia-2009/12/15-1732, `ftp/HandelGF/HWV56/Messiah` in the MutopiaProject GitHub repository),
+licensed **Creative Commons Attribution 3.0** (not public domain). The music itself is by
+George Frideric Handel (public domain).
+
+The edition is a large LilyPond project written for LilyPond 2.13. For each movement, the score file
+and its parts were merged into one self-contained `.ly` file. Custom commands that only changed the
+printed page were removed or replaced with plain LilyPond. Each instrument was then given a MIDI
+sound, and the file was compiled with LilyPond 2.25.12. The notes were not changed. The merged files
+are in `music/sources/lilypond/messiah/`, and the MIDI files are `music/sources/messiah_*.mid`.
+
+| Song | Movement | You play |
+|---|---|---|
+| And the Glory of the Lord | No. 4, chorus (ADchorus) | soprano |
+| Pastoral Symphony "Pifa" | No. 13 (ANpifa) | violin I |
+| For Unto Us a Child Is Born | No. 12, chorus (AMchorus) | soprano |
+| Every Valley | No. 3, tenor air (ACairTenor) | tenor |
+| Worthy Is the Lamb | No. 53, chorus (CIchorus) | soprano |
+| Overture "Sinfonia" | No. 1 (AAsinfonia) | violin I |
+| Amen | Final chorus (CJchorus) | soprano |
 
 ## Verses
 

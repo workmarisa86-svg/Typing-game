@@ -1,10 +1,20 @@
 /* Piano Challenge — falling piano tiles played with the keyboard (real Salamander Grand Piano samples) */
 'use strict';
 
-// ---------- piano sound ----------
+// ---------- piano & orchestra sound (Salamander Grand Piano + FluidR3 orchestra samples) ----------
 const PianoAudio = (() => {
   const SAMPLE_NAMES = ['C', 'Ds', 'Fs', 'A'];
-  let ac = null, master = null;
+  // each instrument has a sample every three semitones between lo and hi
+  const INSTR = {
+    piano: { dir: 'audio/piano/', lo: 36, hi: 96, sus: false, vol: 1 },
+    strings: { dir: 'audio/orch/strings/', lo: 36, hi: 96, sus: true, vol: 0.9 },
+    choir: { dir: 'audio/orch/choir/', lo: 48, hi: 84, sus: true, vol: 1 },
+    oboe: { dir: 'audio/orch/oboe/', lo: 57, hi: 93, sus: true, vol: 0.8 },
+    trumpet: { dir: 'audio/orch/trumpet/', lo: 54, hi: 84, sus: true, vol: 0.75 },
+    timpani: { dir: 'audio/orch/timpani/', lo: 36, hi: 60, sus: false, vol: 0.9 },
+    bassoon: { dir: 'audio/orch/bassoon/', lo: 33, hi: 72, sus: true, vol: 0.8 }
+  };
+  let ac = null, master = null, bus = null;
   const buffers = {}, loading = {};
   function ctx() {
     if (!ac) {
@@ -13,24 +23,34 @@ const PianoAudio = (() => {
       ac = new AC();
       master = ac.createGain();
       master.connect(ac.destination);
+      newBus();
     }
     if (ac.state === 'suspended') ac.resume();
     return ac;
   }
+  // the accompaniment goes through its own bus so it can be silenced at once
+  function newBus() { bus = ac.createGain(); bus.gain.value = 0.55; bus.connect(master); }
+  function stopAcc() {
+    if (!ac || !bus) return;
+    const old = bus, t = ac.currentTime;
+    old.gain.setValueAtTime(old.gain.value, t); old.gain.linearRampToValueAtTime(0, t + 0.08);
+    setTimeout(() => old.disconnect(), 200);
+    newBus();
+  }
   function setVolume(v) { ctx(); if (master) master.gain.value = Math.max(0, Math.min(1, v)) * 0.9; }
-  // nearest recorded sample (every 3 semitones from C2 to C7)
-  function sampleFor(midi) {
-    const m = Math.max(36, Math.min(96, midi));
-    const k = Math.round((m - 36) / 3);
-    const sm = 36 + k * 3;
+  // nearest recorded sample of that instrument
+  function sampleFor(midi, inst = 'piano') {
+    const I = INSTR[inst] || INSTR.piano;
+    const first = Math.ceil((I.lo - 1) / 3) * 3, last = Math.floor((I.hi + 1) / 3) * 3;
+    const sm = Math.max(first, Math.min(last, Math.round(midi / 3) * 3));
     const name = SAMPLE_NAMES[(sm % 12) / 3] + (Math.floor(sm / 12) - 1);
-    return { name, rate: Math.pow(2, (midi - sm) / 12) };
+    return { name: I.dir + name, rate: Math.pow(2, (midi - sm) / 12) };
   }
   function load(name) {
     if (buffers[name]) return Promise.resolve(buffers[name]);
     if (!loading[name]) {
       const a = ctx();
-      loading[name] = fetch('audio/piano/' + name + '.mp3')
+      loading[name] = fetch(name + '.mp3')
         .then(r => { if (!r.ok) throw new Error('sample'); return r.arrayBuffer(); })
         .then(b => new Promise((res, rej) => a.decodeAudioData(b, res, rej)))
         .then(buf => { buffers[name] = buf; return buf; })
@@ -38,43 +58,49 @@ const PianoAudio = (() => {
     }
     return loading[name];
   }
-  // load only the samples a song needs
-  function preload(pitches) {
-    const names = new Set([...pitches].map(p => sampleFor(p).name));
-    names.add('C3'); names.add('Ds3');
+  // load only the samples a song needs: { instrument: Set(pitches) }
+  function preload(parts) {
+    const names = new Set([sampleFor(48).name, sampleFor(51).name]);
+    Object.entries(parts).forEach(([inst, ps]) => ps.forEach(p => names.add(sampleFor(p, inst).name)));
     return Promise.all([...names].map(load));
   }
-  function play(midi, dur = 0.6, vel = 0.8) {
+  function play(midi, dur = 0.6, vel = 0.8, inst = 'piano', when = 0, out = null) {
     const a = ctx(); if (!a) return;
-    const { name, rate } = sampleFor(midi);
-    const t = a.currentTime;
+    const I = INSTR[inst] || INSTR.piano;
+    const { name, rate } = sampleFor(midi, inst);
+    const t = Math.max(a.currentTime, when || 0);
     const g = a.createGain();
-    g.connect(master);
+    g.connect(out || master);
     const buf = buffers[name];
+    const v = vel * I.vol;
     if (buf) {
       const src = a.createBufferSource();
       src.buffer = buf; src.playbackRate.value = rate;
       src.connect(g);
-      const len = Math.max(0.25, Math.min(2.6, dur));
-      g.gain.setValueAtTime(vel, t);
-      g.gain.setValueAtTime(vel, t + len);
-      g.gain.exponentialRampToValueAtTime(0.001, t + len + 0.35);
-      src.start(t); src.stop(t + len + 0.4);
-    } else {
+      const len = Math.max(I.sus ? 0.12 : 0.25, Math.min(I.sus ? 2.3 : 2.6, dur));
+      const rel = I.sus ? 0.18 : 0.35;
+      g.gain.setValueAtTime(I.sus ? 0.0001 : v, t);
+      if (I.sus) g.gain.exponentialRampToValueAtTime(v, t + 0.03);
+      g.gain.setValueAtTime(v, t + len);
+      g.gain.exponentialRampToValueAtTime(0.001, t + len + rel);
+      src.start(t); src.stop(t + len + rel + 0.05);
+    } else if (!out) {
       // fallback when samples cannot load (e.g. opened as a local file)
       const o = a.createOscillator();
       o.type = 'triangle'; o.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
       o.connect(g);
-      g.gain.setValueAtTime(vel * 0.3, t); g.gain.exponentialRampToValueAtTime(0.001, t + Math.min(1.5, dur + 0.3));
+      g.gain.setValueAtTime(v * 0.3, t); g.gain.exponentialRampToValueAtTime(0.001, t + Math.min(1.5, dur + 0.3));
       o.start(t); o.stop(t + 1.6);
     }
   }
-  function chord(pitches, dur) {
+  function chord(pitches, dur, inst = 'piano') {
     const v = pitches.length > 3 ? 0.55 : 0.75;
-    pitches.forEach((p, i) => play(p, dur, i === 0 ? v + 0.1 : v * 0.8));
+    pitches.forEach((p, i) => play(p, dur, i === 0 ? v + 0.1 : v * 0.8, inst));
   }
+  // accompaniment note at an exact time from now (seconds)
+  function accNote(midi, dur, inst, inSec) { const a = ctx(); if (!a) return; play(midi, dur, 0.7, inst, a.currentTime + inSec, bus); }
   function wrong() { play(40, 0.18, 0.7); play(41, 0.18, 0.7); play(46, 0.18, 0.5); }
-  return { ctx, setVolume, preload, play, chord, wrong, sampleFor };
+  return { ctx, setVolume, preload, play, chord, accNote, stopAcc, wrong, sampleFor };
 })();
 
 // ---------- the mode ----------
@@ -83,8 +109,16 @@ const PianoAudio = (() => {
 const Piano = (() => {
   const $ = id => document.getElementById(id);
   const DIFFS = ['beginner', 'easy', 'medium', 'hard', 'expert'];
-  const KEYS = { beginner: ['d', 'f', 'j', 'k'], easy: ['d', 'f', 'j', 'k'], medium: ['s', 'd', 'f', 'j', 'k', 'l'],
-    hard: ['a', 's', 'd', 'f', 'j', 'k', 'l', ';'], expert: ['a', 's', 'd', 'f', 'j', 'k', 'l', ';'] };   // Learn mode lanes (Play mode always uses 4)
+  // Learn mode lanes: 4 / 6 / 8 keys from the keyboard row the player chose (Play mode always uses 4 tap lanes)
+  const ROWS = {
+    home: ['a', 's', 'd', 'f', 'j', 'k', 'l', ';'],
+    top: ['q', 'w', 'e', 'r', 'u', 'i', 'o', 'p'],
+    bottom: ['z', 'x', 'c', 'v', 'm', ',', '.', '/'],
+    numbers: ['1', '2', '3', '4', '7', '8', '9', '0']
+  };
+  const ROW_NAMES = Object.keys(ROWS);
+  const LANES = { beginner: 4, easy: 4, medium: 6, hard: 8, expert: 8 };
+  const rowKeys = (row, n) => { const r = ROWS[row] || ROWS.home; return n === 8 ? r.slice() : n === 6 ? r.slice(1, 7) : r.slice(2, 6); };
   const PHONE_KEYS = ['d', 'f', 'j', 'k'];
   const PLAY_LANES = 4;
   const PER_LEVEL = 3;          // Play mode: three songs per level
@@ -106,7 +140,8 @@ const Piano = (() => {
     return pd;
   }
   const modeData = (profile, m) => data(profile)[m || mode];
-  function keysFor(diff, phone) { const k = KEYS[diff]; return phone && k.length > 4 ? PHONE_KEYS : k; }
+  const keyRow = () => { const r = U.profile() && U.profile().settings.pianoRow; return ROWS[r] ? r : 'home'; };
+  function keysFor(diff, phone) { return rowKeys(keyRow(), phone ? 4 : LANES[diff]); }
   const diffName = d => t('pd_' + d);
 
   // ---------- Learn mode unlocks: in order, finished songs stay open ----------
@@ -136,7 +171,7 @@ const Piano = (() => {
     const body = $('pm-body'); body.innerHTML = '';
     body.classList.toggle('play-list', mode === 'play');
     if (mode === 'play') playList(profile, body); else learnList(profile, body);
-    const next = body.querySelector('.pm-song.next');
+    const next = body.querySelector('.pm-song.last') || body.querySelector('.pm-song.next');
     if (next) requestAnimationFrame(() => next.scrollIntoView({ block: 'center' }));
   }
   function songCard(s, i, r, locked, extraCls, hue, onclick) {
@@ -152,7 +187,7 @@ const Piano = (() => {
     return card;
   }
   function playList(profile, body) {
-    const list = songs(), d = modeData(profile, 'play').songs, have = playStars(profile);
+    const list = songs(), d = modeData(profile, 'play').songs, have = playStars(profile), last = modeData(profile, 'play').last;
     body.append(U.h('div', { class: 'pm-banner' }, U.h('b', {}, '★ ' + have), U.h('span', {}, t('playIntro'))));
     let nextMarked = false;
     for (let k = 0; k * PER_LEVEL < list.length; k++) {
@@ -163,8 +198,8 @@ const Piano = (() => {
         open ? '' : U.h('span', {}, '🔒 ' + t('needStars', levelNeed(k)))));
       list.slice(k * PER_LEVEL, (k + 1) * PER_LEVEL).forEach((s, j) => {
         const i = k * PER_LEVEL + j, r = d[s.id] || {};
-        let cls = '';
-        if (open && !r.stars && !nextMarked) { cls = ' next'; nextMarked = true; }
+        let cls = s.id === last ? ' last' : '';
+        if (open && !r.stars && !nextMarked && !last) { cls = ' next'; nextMarked = true; }
         body.append(songCard(s, i, r, !open, cls, hue + j * 2, () => {
           if (!open) { Sound.play('nope'); U.toast(t('needStarsToast', levelNeed(k) - have)); return; }
           songIntro(i);
@@ -173,8 +208,14 @@ const Piano = (() => {
     }
   }
   function learnList(profile, body) {
-    const list = songs(), d = modeData(profile, 'learn').songs, phone = U.isPhone();
+    const list = songs(), d = modeData(profile, 'learn').songs, phone = U.isPhone(), last = modeData(profile, 'learn').last;
     body.append(U.h('div', { class: 'pm-banner' }, U.h('span', {}, t('learnIntro'))));
+    // which keyboard row to train: home, top, bottom or numbers
+    const cur = keyRow();
+    body.append(U.h('div', { class: 'pm-rows' }, U.h('b', {}, t('keyRow')),
+      ...ROW_NAMES.map(r => U.h('button', { class: 'pm-row' + (r === cur ? ' on' : ''), onclick: () => {
+        profile.settings.pianoRow = r; Store.save(); Sound.play('click'); openMenu();
+      } }, U.h('span', {}, t('row_' + r)), U.h('small', {}, rowKeys(r, 4).join(' ').toUpperCase())))));
     let nextMarked = false;
     DIFFS.forEach(diff => {
       const group = list.map((s, i) => ({ s, i })).filter(x => x.s.diff === diff);
@@ -185,8 +226,8 @@ const Piano = (() => {
       group.forEach(({ s, i }, j) => {
         const r = d[s.id] || {};
         const locked = !learnOpen(profile, i);
-        let cls = '';
-        if (!locked && !r.done && !nextMarked) { cls = ' next'; nextMarked = true; }
+        let cls = s.id === last ? ' last' : '';
+        if (!locked && !r.done && !nextMarked && !last) { cls = ' next'; nextMarked = true; }
         body.append(songCard(s, i, r, locked, cls, DIFF_HUE[diff] + (j % 3) * 2, () => {
           if (locked) { Sound.play('nope'); U.toast(t('pianoLocked')); return; }
           songIntro(i);
@@ -209,6 +250,7 @@ const Piano = (() => {
       U.h('h2', {}, '🎹 ' + title(s)),
       U.h('p', { class: 'center' }, s.composer),
       U.h('p', { class: 'center small' }, diffName(s.diff)),
+      U.h('p', { class: 'center' }, '🎻 ' + t('yourPart', t('inst_' + (s.part || 'piano'))) + ((s.acc || []).length ? ' · ' + t('restPlays', (s.accInst || []).map(n => t('inst_' + n)).join(', ')) : '')),
       play ? U.h('p', { class: 'center' }, '👆 ' + t('playHow'))
         : U.h('div', { class: 'intro-keys' }, keys.map(k => U.h('div', { class: 'kcap', style: 'background:#fff' }, k.toUpperCase()))),
       U.h('p', { class: 'center small' }, t('pianoHow')),
@@ -328,6 +370,7 @@ const Piano = (() => {
     gaps.sort((a, b) => a - b);
     const medGap = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 1;
     const last = s.ev[s.ev.length - 1];
+    modeData(profile, mode).last = s.id; Store.save();   // the song list highlights the last piece played
     P = {
       song: s, index: i, keys, cols: assignColumns(s.ev, keys.length), play,
       practice: !play && profile.settings.mode === 'practice', phone,
@@ -344,10 +387,21 @@ const Piano = (() => {
     buildKeyRow();
     Sound.pauseMusic(true);   // no background music while a piece plays
     PianoAudio.setVolume((profile.settings.volume == null ? 80 : profile.settings.volume) / 100);
-    const pitches = new Set();
-    s.ev.forEach(e => e.slice(2).forEach(p => pitches.add(p)));
+    // you play one part (s.part); every other part of the piece plays by itself (s.acc)
+    P.part = s.part || 'piano';
+    const parts = { [P.part]: new Set() };
+    s.ev.forEach(e => e.slice(2).forEach(p => parts[P.part].add(p)));
+    const acc = s.acc || [], accInst = s.accInst || [];
+    acc.forEach(a => { const n = accInst[a[3]] || 'piano'; (parts[n] = parts[n] || new Set()).add(a[2]); });
+    P.accSeg = s.ev.map((e, k) => {
+      const lo = e[0] - 1e-6, hi = k + 1 < s.ev.length ? s.ev[k + 1][0] - 1e-6 : Infinity;
+      let a = 0; while (a < acc.length && acc[a][0] < lo) a++;
+      let b = a; while (b < acc.length && acc[b][0] < hi) b++;
+      return [a, b];
+    });
     $('pp-loading').classList.remove('hidden');
-    PianoAudio.preload(pitches).then(() => { if (P && P.song === s) { P.loaded = true; $('pp-loading').classList.add('hidden'); } });
+    PianoAudio.stopAcc();
+    PianoAudio.preload(parts).then(() => { if (P && P.song === s) { P.loaded = true; $('pp-loading').classList.add('hidden'); } });
     if (phone && !play) focusInput();
     resize();
     cancelAnimationFrame(raf);
@@ -406,7 +460,8 @@ const Piano = (() => {
     const k = P.next, col = tileCol(k), len = rowLenK(k), e = tileEv(k);
     P.pressed[col] = 0.15;
     P.started = true;
-    PianoAudio.chord(e.slice(2), Math.min(2.5, len / rowSpeed() + 0.15));
+    PianoAudio.chord(e.slice(2), Math.min(2.5, len / rowSpeed() + 0.15), P.part);
+    playAcc(k, playSpb(k));
     P.hits++; P.combo++; P.bestCombo = Math.max(P.bestCombo, P.combo);
     P.score += 1;
     P.pops.push({ col, t: 0.4, q: 1 });
@@ -443,7 +498,23 @@ const Piano = (() => {
       hud(); finish();
     }
   }
-  function stop() { cancelAnimationFrame(raf); if (P) Sound.pauseMusic(false); P = null; }
+  function stop() { cancelAnimationFrame(raf); PianoAudio.stopAcc(); if (P) Sound.pauseMusic(false); P = null; }
+  // the rest of the music for tile k, spread over the time until the next tile (spb = seconds per beat now)
+  function playAcc(k, spb) {
+    const s = P.song, i = k % nTiles(), seg = P.accSeg && P.accSeg[i];
+    if (!seg || seg[0] === seg[1]) return;
+    const b0 = s.ev[i][0], names = s.accInst;
+    for (let a = seg[0]; a < seg[1]; a++) {
+      const n = s.acc[a];
+      PianoAudio.accNote(n[2], n[1] * spb, names[n[3]] || 'piano', (n[0] - b0) * spb);
+    }
+  }
+  // Play mode: a tile lasts rowLen rows, so the beats until the next tile are stretched to that time
+  function playSpb(k) {
+    const i = k % nTiles(), ev = P.song.ev;
+    const beats = i + 1 < ev.length ? ev[i + 1][0] - ev[i][0] : Math.max(ev[i][1], P.medGap);
+    return (rowLenK(k) / rowSpeed()) / Math.max(beats, 1e-3);
+  }
 
   // tile k (Play mode repeats the song in faster rounds)
   const nTiles = () => P.song.ev.length;
@@ -452,8 +523,9 @@ const Piano = (() => {
   const tileCol = k => P.cols[k % nTiles()];
   function speedMul() {
     if (P.play) return Math.pow(LAP_SPEEDUP, Math.floor(P.next / nTiles()));   // steady inside a round
-    const prog = P.next / nTiles();
-    return P.practice ? 0.85 + 0.2 * prog : 1 + 0.25 * prog;
+    // Learn mode: a little faster through the song, and 15% faster on every new round
+    const prog = (P.next % nTiles()) / nTiles(), lap = Math.pow(LAP_SPEEDUP, P.lap);
+    return (P.practice ? 0.85 + 0.2 * prog : 1 + 0.25 * prog) * lap;
   }
   const lives = () => P.play ? 1 : 3;   // Play mode: one mistake ends the song (music tiles); Learn mode: three lives
   function secPerBeat() {
@@ -470,7 +542,7 @@ const Piano = (() => {
     if (P.banner) { P.banner.t -= dt; if (P.banner.t <= 0) P.banner = null; }
     if (P.play) { playUpdate(dt); return; }
     if (!P.started || P.over) return;
-    const nb = (!P.play && P.next >= nTiles()) ? Infinity : tileBeat(P.next);
+    const nb = tileBeat(P.next);
     let adv = dt / secPerBeat();
     if (P.practice && P.beat + adv > nb) adv = Math.max(0, nb - P.beat);   // Learn practice: wait for the right key
     P.beat += adv;
@@ -478,6 +550,7 @@ const Piano = (() => {
     if (!P.practice && nb !== Infinity && (P.beat - nb) * secPerBeat() > 0.3) {
       P.flashes.push({ k: P.next, t: 0.45 });
       P.misses++; P.combo = 0; PianoAudio.wrong();
+      playAcc(P.next, secPerBeat());   // the rest of the music carries on
       advance();
       hud();
       if (P.misses + P.wrongs >= lives()) finish();
@@ -492,14 +565,20 @@ const Piano = (() => {
         P.banner = { text: P.lap <= 3 ? '★'.repeat(P.lap) : '👑 ' + (P.lap - 3), t: 1.6 };
         Sound.play('star');
         P.beat = Math.max(P.beat, tileBeat(P.next) - 1.5);
-      } else finish();
+      } else {
+        // Learn mode: the song starts again straight away, faster, until the lives run out (or you stop)
+        P.lap++;
+        P.banner = { text: t('roundClap', P.lap), t: 1.8 };
+        Sound.play('star');
+        P.beat = Math.max(P.beat, tileBeat(P.next) - 2);
+      }
     }
   }
   function key(ch, tapCol) {
     if (!P || P.over || P.paused) return;
     ch = (ch || '').toLowerCase();
     const col = tapCol != null ? tapCol : P.keys.indexOf(ch);
-    if (col < 0 && !/^[a-z;]$/.test(ch)) return;
+    if (col < 0 && !/^[a-z0-9;,./]$/.test(ch)) return;
     PianoAudio.ctx();
     if (col >= 0) { P.pressed[col] = 0.15; pressKeyRow(col); }
     const k = P.next;
@@ -512,7 +591,8 @@ const Piano = (() => {
     const early = (tileBeat(k) - P.beat) * secPerBeat();
     if (col === tileCol(k)) {
       if (!P.play && early > 1.4) return;                  // Learn mode: right key, far too early: ignored, no penalty
-      PianoAudio.chord(e.slice(2), Math.min(e[1], 2) * secPerBeat());
+      PianoAudio.chord(e.slice(2), Math.min(e[1], 2) * secPerBeat(), P.part);
+      playAcc(k, secPerBeat());
       const err = Math.abs(early);
       const q = err < 0.09 ? 1 : err < 0.2 ? 0.8 : 0.6;
       P.hits++; P.combo++; P.bestCombo = Math.max(P.bestCombo, P.combo);
@@ -542,12 +622,13 @@ const Piano = (() => {
   function finish() {
     if (P.over) return;
     P.over = true;
+    PianoAudio.stopAcc();
     const profile = U.profile(), all = data(profile), md = modeData(profile), s = P.song;
     const acc = accuracy();
     let stars, done;
     if (P.play) { stars = P.stars; done = P.lap > 0; }
     else {
-      done = P.next >= nTiles();
+      done = P.lap > 0;
       stars = 0;
       if (done) { stars = 1; if (acc >= 90) stars = 2; if (acc >= 97 && P.misses === 0) stars = 3; }
     }
@@ -684,7 +765,7 @@ const Piano = (() => {
     });
     if (P.banner) {
       cx.globalAlpha = Math.min(1, P.banner.t);
-      cx.fillStyle = '#8fd3ff'; cx.font = `700 ${Math.round(46 * d)}px Fredoka, system-ui, sans-serif`;
+      cx.fillStyle = '#8fd3ff'; cx.font = `700 ${Math.round(Math.min(40 * d, W / 11))}px Fredoka, system-ui, sans-serif`;
       cx.fillText(P.banner.text, W / 2, H * 0.35);
       cx.font = `600 ${Math.round(18 * d)}px Fredoka, system-ui, sans-serif`; cx.fillStyle = '#fff';
       cx.fillText(t('fasterNow'), W / 2, H * 0.35 + 40 * d);
@@ -781,10 +862,12 @@ const Piano = (() => {
   function pause() {
     if (!P || P.over) return;
     P.paused = true; if (P.play) release();
+    PianoAudio.stopAcc();
     U.openModal(U.h('h2', {}, t('paused')),
       U.h('div', { class: 'row-btns', style: 'justify-content:center' },
         U.h('button', { class: 'btn btn-ghost', onclick: () => { U.closeModal(); stop(); openMenu(); } }, t('songs')),
         U.h('button', { class: 'btn btn-ghost', onclick: () => { U.closeModal(); start(P.index); } }, t('restart')),
+        !P.play && P.lap > 0 ? U.h('button', { class: 'btn btn-ghost', onclick: () => { U.closeModal(); P.paused = false; finish(); } }, t('finishNow') + ' ✓') : '',
         U.h('button', { class: 'btn btn-gold', onclick: () => { U.closeModal(); P.paused = false; if (P.phone && !P.play) focusInput(); } }, t('resume') + ' ▶')));
   }
 
