@@ -210,6 +210,9 @@ Update the README, bump the service worker version so players get the update, an
   - finishing a round shows short text and confetti (no sound but the star chime) while the tiles keep moving
   - the background is our own creative design (not copied)
 - Tiles never overlap. Background music pauses while a piece plays. The composer appears under the title in the song list, not while playing. The song lists are more colorful.
+- Learn mode: the player chooses which keyboard row to train (home, top, bottom or numbers), and a finished song repeats 15% faster until the lives run out.
+- In every piece the player plays one part. All other parts (left hand, orchestra, choir) play by themselves in time with the player, using piano and orchestra samples.
+- Messiah: the full-orchestra Hallelujah Chorus plus seven more movements.
 - All 15 Bach two-part Inventions are included (same public-domain source rules).
 
 ## Ideas for a future Stage 3 (not requested yet)

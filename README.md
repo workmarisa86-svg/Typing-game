@@ -215,6 +215,51 @@ matches its source text exactly. See `data/sources/SOURCE.md`. To rebuild, run
 - **Phone mode** uses letters and space only, hides the on-screen keyboard, and shows simpler
   scenes. A hidden input opens the phone keyboard.
 
+## Version 3.3.0: key rows, play one part, orchestra, Messiah
+
+- **Keys to train (Learn mode)**: the Learn song list has a row picker: **Home row**, **Top row**,
+  **Bottom row** or **Numbers**. Each difficulty uses 4, 6 or 8 keys from that row, taken from the
+  middle outwards:
+  - Home row: D F J K / S D F J K L / A S D F J K L ;
+  - Top row: E R U I / W E R U I O / Q W E R U I O P
+  - Bottom row: C V M , / X C V M , . / Z X C V M , . /
+  - Numbers: 3 4 7 8 / 2 3 4 7 8 9 / 1 2 3 4 7 8 9 0
+
+  The choice is saved per player. Phones still use 4 keys.
+- **The last piece you played is highlighted** in each list (Play and Learn), and the list scrolls
+  to it. Before you have played anything, the first unfinished song is highlighted as before.
+- **You play one part, the rest plays by itself**:
+  - Each piece now has a part for you (usually the melody or the right hand), and every other note
+    of the source becomes an accompaniment that plays in time with you.
+  - The accompaniment for each tile is spread over the time until the next tile, so it follows your
+    speed in both Play and Learn mode.
+  - The two-part Inventions, preludes, fugues, sonatas and other full pieces: you play the upper
+    part, and the lower part plays by itself, so you hear both hands.
+  - If you lose, pause or leave, the accompaniment stops at once.
+- **Orchestra sounds**: string, choir, oboe, trumpet, timpani and bassoon samples. Orchestral
+  pieces use them for the instruments in the source file (for example, the strings in Water Music).
+  Your own part uses its instrument's sound too: in the choruses you play the soprano line with the
+  choir sound. The song intro shows "You play: …" and which instruments play the rest.
+- **Messiah**: the Hallelujah Chorus now has the full orchestra and choir, and you play the
+  soprano part. Seven more movements were added:
+  - And the Glory of the Lord
+  - Pastoral Symphony "Pifa"
+  - For Unto Us a Child Is Born
+  - Every Valley
+  - Worthy Is the Lamb
+  - Overture
+  - Amen
+
+  They come from the CC BY 3.0 Mutopia edition (see CREDITS.md). They sit right after the
+  Hallelujah Chorus in the song order, so they open early. Long movements are trimmed to the tile
+  limit of their difficulty.
+- **Learn mode repeats faster**: when you finish a song, it starts again straight away, 15% faster,
+  until you lose your 3 lives. In practice mode, where there is no game over, you stop with
+  Pause → **Finish**. A finished round is what counts for unlocking the next song.
+- The song file is now about 590 KB (it was 270 KB) because of the accompaniment notes. Orchestra
+  samples (about 1.3 MB in total) are downloaded only when a song needs them, then kept for offline
+  play.
+
 ## Version 3.2.0: main menu, Piano Xpert Play and Learn modes
 
 - **Main menu**: after you choose your player (and their look and clothes), you pick

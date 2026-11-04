@@ -8,7 +8,7 @@ Each song becomes a list of tiles: [beat, durationBeats, pitch1, pitch2, ...]. T
 melody note (it decides the column); the other pitches are the chord that sounds with it. Nothing is
 typed by hand: every pitch comes from the source files (only transposed or trimmed as listed below).
 """
-import json, os, statistics
+import bisect, json, os, statistics
 import mido
 from music21 import converter
 
@@ -27,6 +27,7 @@ def read_midi(name):
     ts = next(((msg.numerator, msg.denominator) for t in m.tracks for msg in t if msg.type == 'time_signature'), (4, 4))
     ks = next((KEYS.get(msg.key, 0) for t in m.tracks for msg in t if msg.type == 'key_signature'), 0)
     META['last'] = {'ts': list(ts), 'ks': ks}
+    META['progs'] = {ti: next((msg.program for msg in t if msg.type == 'program_change'), None) for ti, t in enumerate(m.tracks)}
     out = []
     for ti, t in enumerate(m.tracks):
         tick = 0; on = {}
@@ -54,6 +55,7 @@ def read_m21(name, index=None, bpm=100):
     if mm: bpm = mm[0].getQuarterBPM() or bpm
     tsl = s.flatten().getElementsByClass('TimeSignature')
     ksl = s.flatten().getElementsByClass('KeySignature')
+    META['progs'] = {}
     META['last'] = {'ts': [tsl[0].numerator, tsl[0].denominator] if tsl else [4, 4], 'ks': ksl[0].sharps if ksl else 0}
     return sorted(out), bpm
 
@@ -89,6 +91,27 @@ def skyline(notes):
     return sorted(best.values())
 
 def build(notes, mode, melody_tracks=None, harmony=True):
+    """Tiles for the part the player plays. Every other note of the source becomes the accompaniment
+    (META['acc']) that plays by itself in time with the player."""
+    pool = [n for n in notes if melody_tracks is None or n[3] in melody_tracks]
+    tiles = build_tiles(pool, mode, harmony)
+    used = set((round(t[0] * 48), p) for t in tiles for p in t[2:])
+    META['acc'] = [n for n in notes if (round(n[0] * 48), n[2]) not in used]
+    META['part'] = inst_of(META.get('progs', {}).get(melody_tracks[0])) if melody_tracks else 'piano'
+    return tiles
+
+def inst_of(prog):
+    """General MIDI program -> one of the game's sampled instruments."""
+    if prog is None: return 'piano'
+    if 40 <= prog <= 45 or 48 <= prog <= 51 or 32 <= prog <= 39: return 'strings'
+    if prog == 47: return 'timpani'
+    if 52 <= prog <= 54: return 'choir'
+    if 56 <= prog <= 63: return 'trumpet'
+    if prog == 70: return 'bassoon'
+    if 64 <= prog <= 79: return 'oboe'
+    return 'piano'
+
+def build_tiles(notes, mode, harmony):
     if mode == 'full':
         onsets = {}
         for n in notes: onsets.setdefault(round(n[0] * 48), []).append(n)
@@ -97,8 +120,7 @@ def build(notes, mode, melody_tracks=None, harmony=True):
             ns = sorted(onsets[k], key=lambda n: -n[2])
             tiles.append([ns[0][0], ns[0][1], ns[0][2]] + [n[2] for n in ns[1:]])
         return tiles
-    pool = [n for n in notes if melody_tracks is None or n[3] in melody_tracks]
-    mel = skyline(pool)
+    mel = skyline(notes)
     tiles = []
     for m in mel:
         chord = []
@@ -113,6 +135,7 @@ MAX_TILES = {'beginner': 999, 'easy': 140, 'medium': 170, 'hard': 260, 'expert':
 def finish(tiles, bpm, diff, start=0, end=None, transpose=0, max_tiles=None):
     tiles = [t for t in tiles if t[0] >= start - EPS and (end is None or t[0] < end - EPS)]
     tiles = tiles[:max_tiles or MAX_TILES[diff]]
+    orig = [t[0] for t in tiles]
     t0 = tiles[0][0]
     meta = dict(META.get('last', {'ts': [4, 4], 'ks': 0}))
     bar = meta['ts'][0] * 4 / meta['ts'][1]
@@ -125,6 +148,22 @@ def finish(tiles, bpm, diff, start=0, end=None, transpose=0, max_tiles=None):
             shift += (b - prev) - 2; b = prev + 2
         out.append([round(b, 4), round(min(t[1], 4), 4)] + [p + transpose for p in t[2:]])
         prev = b
+    # accompaniment: same time line as the tiles (long rests squeezed the same way), one note per beat+pitch
+    acc, seen, insts = [], set(), []
+    end_b = orig[-1] + max(tiles[-1][1], 1)
+    for n in META.get('acc', []):
+        if n[0] < orig[0] - EPS or n[0] > end_b: continue
+        i = bisect.bisect_right(orig, n[0] + EPS) - 1
+        nb = out[i][0] + (n[0] - orig[i])
+        if i + 1 < len(out): nb = min(nb, out[i + 1][0] - 0.01)
+        key = (round(nb * 48), n[2])
+        if key in seen: continue
+        seen.add(key)
+        inst = inst_of(META.get('progs', {}).get(n[3]))
+        if inst not in insts: insts.append(inst)
+        acc.append([round(nb, 3), round(min(n[1], 4), 3), n[2] + transpose, insts.index(inst)])
+    acc.sort()
+    META['song']['acc'] = acc; META['song']['accInst'] = insts
     # slow the tempo down if notes come faster than the level can handle
     gaps = [out[i + 1][0] - out[i][0] for i in range(len(out) - 1) if out[i + 1][0] > out[i][0]]
     med = statistics.median(gaps) if gaps else 1
@@ -175,7 +214,16 @@ song('holy-holy-holy', 'Holy, Holy, Holy', 'Santo, santo, santo', 'John Bacchus 
 
 song('conquering-hero', 'See the Conquering Hero Comes', 'Ved al héroe vencedor', 'George Frideric Handel', 'easy', 'conquering_hero.mid', 'cellist', mid('conquering_hero.mid', tracks=[1]), transpose=2)
 song('ombra-mai-fu', 'Largo "Ombra mai fù"', 'Largo «Ombra mai fù»', 'George Frideric Handel', 'easy', 'ombra.mid', 'cellist', mid('ombra.mid', tracks=[1]), start=43)
-song('hallelujah', 'Hallelujah Chorus (melody)', 'Coro Aleluya (melodía)', 'George Frideric Handel', 'easy', 'hallelujah.mid', 'mutopia', mid('hallelujah.mid', bpm=72), start=12)
+song('hallelujah', 'Hallelujah Chorus (Messiah)', 'Coro Aleluya (El Mesías)', 'George Frideric Handel', 'easy', 'hallelujah_full.mid', 'mutopia', mid('hallelujah_full.mid', tracks=[9], bpm=72), start=12)
+# Messiah, HWV 56 (Mutopia edition by Nicolas Sceaux, CC BY 3.0): you play one part, the orchestra and choir play the rest
+H, MS = 'George Frideric Handel', 'mutopia-messiah'
+song('messiah-glory', 'And the Glory of the Lord (Messiah)', 'Y la gloria del Señor (El Mesías)', H, 'medium', 'messiah_ADchorus.mid', MS, mid('messiah_ADchorus.mid', tracks=[4], bpm=144))
+song('messiah-pifa', 'Pastoral Symphony "Pifa" (Messiah)', 'Sinfonía pastoral «Pifa» (El Mesías)', H, 'medium', 'messiah_ANpifa.mid', MS, mid('messiah_ANpifa.mid', tracks=[1], bpm=96))
+song('messiah-unto-us', 'For Unto Us a Child Is Born (Messiah)', 'Porque un niño nos es nacido (El Mesías)', H, 'hard', 'messiah_AMchorus.mid', MS, mid('messiah_AMchorus.mid', tracks=[4], bpm=96))
+song('messiah-every-valley', 'Every Valley (Messiah)', 'Todo valle (El Mesías)', H, 'hard', 'messiah_ACairTenor.mid', MS, mid('messiah_ACairTenor.mid', tracks=[4], bpm=100))
+song('messiah-worthy', 'Worthy Is the Lamb (Messiah)', 'Digno es el Cordero (El Mesías)', H, 'hard', 'messiah_CIchorus.mid', MS, mid('messiah_CIchorus.mid', tracks=[6], bpm=72))
+song('messiah-overture', 'Overture "Sinfonia" (Messiah)', 'Obertura «Sinfonía» (El Mesías)', H, 'expert', 'messiah_AAsinfonia.mid', MS, mid('messiah_AAsinfonia.mid', tracks=[1], bpm=60), max_tiles=600)
+song('messiah-amen', 'Amen (Messiah)', 'Amén (El Mesías)', H, 'expert', 'messiah_CJchorus.mid', MS, mid('messiah_CJchorus.mid', tracks=[6], bpm=100), max_tiles=600)
 song('sheep-graze', 'Sheep May Safely Graze (melody)', 'Las ovejas pueden pastar seguras (melodía)', 'Johann Sebastian Bach', 'easy', 'sheep.mid', 'mutopia', mid('sheep.mid', tracks=[3], bpm=66), start=16)
 song('sleepers-wake', 'Sleepers, Wake! (chorale melody)', 'Despertad, la voz nos llama (coral)', 'Johann Sebastian Bach', 'easy', 'bwv140.7.mxl', 'music21', mxl('bwv140.7.mxl', tracks=[0], bpm=76))
 
@@ -199,26 +247,26 @@ song('passepied', 'Passepied (Aylesford Pieces)', 'Passepied (Piezas de Aylesfor
 song('rejouissance', 'La Réjouissance (Royal Fireworks), HWV 351', 'La Réjouissance (Fuegos artificiales), HWV 351', 'George Frideric Handel', 'medium', 'rejouissance.mid', 'mutopia', mid('rejouissance.mid', tracks=[1, 2]))
 song('fireworks-bourree', 'Bourrée (Royal Fireworks), HWV 351', 'Bourrée (Fuegos artificiales), HWV 351', 'George Frideric Handel', 'medium', 'fireworks_bourree.mid', 'cellist', mid('fireworks_bourree.mid', tracks=[1]))
 
-song('prelude-c', 'Prelude in C Major, BWV 846', 'Preludio en do mayor, BWV 846', 'Johann Sebastian Bach', 'hard', 'bwv846.mid', 'mutopia', mid('bwv846.mid', 'full'))
+song('prelude-c', 'Prelude in C Major, BWV 846', 'Preludio en do mayor, BWV 846', 'Johann Sebastian Bach', 'hard', 'bwv846.mid', 'mutopia', mid('bwv846.mid', 'full', [1]))
 song('little-prelude-cm', 'Little Prelude in C minor, BWV 999', 'Pequeño preludio en do menor, BWV 999', 'Johann Sebastian Bach', 'hard', 'bwv999.mid', 'mutopia', mid('bwv999.mid', 'full'))
-song('bourree-em', 'Bourrée in E minor, BWV 996', 'Bourrée en mi menor, BWV 996', 'Johann Sebastian Bach', 'hard', 'bwv996.mid', 'mutopia', mid('bwv996.mid', 'full'))
-song('badinerie', 'Badinerie, BWV 1067', 'Badinerie, BWV 1067', 'Johann Sebastian Bach', 'hard', 'badinerie.mid', 'cellist', mid('badinerie.mid', 'full'))
-song('queen-of-sheba', 'Arrival of the Queen of Sheba', 'La llegada de la reina de Saba', 'George Frideric Handel', 'hard', 'sheba.mid', 'cellist', mid('sheba.mid', 'full'))
-song('harmonious-blacksmith', 'The Harmonious Blacksmith', 'El herrero armonioso', 'George Frideric Handel', 'hard', 'blacksmith.mid', 'cellist', mid('blacksmith.mid', 'full'), transpose=-1)
-song('k545-rondo', 'Sonata K. 545, 3rd movement (Rondo)', 'Sonata K. 545, 3.er movimiento (Rondó)', 'Wolfgang Amadeus Mozart', 'hard', 'k545_3.mid', 'mutopia', mid('k545_3.mid', 'full'), max_tiles=400)
+song('bourree-em', 'Bourrée in E minor, BWV 996', 'Bourrée en mi menor, BWV 996', 'Johann Sebastian Bach', 'hard', 'bwv996.mid', 'mutopia', mid('bwv996.mid', 'full', [1]))
+song('badinerie', 'Badinerie, BWV 1067', 'Badinerie, BWV 1067', 'Johann Sebastian Bach', 'hard', 'badinerie.mid', 'cellist', mid('badinerie.mid', 'full', [1]))
+song('queen-of-sheba', 'Arrival of the Queen of Sheba', 'La llegada de la reina de Saba', 'George Frideric Handel', 'hard', 'sheba.mid', 'cellist', mid('sheba.mid', 'full', [1]))
+song('harmonious-blacksmith', 'The Harmonious Blacksmith', 'El herrero armonioso', 'George Frideric Handel', 'hard', 'blacksmith.mid', 'cellist', mid('blacksmith.mid', 'full', [1]), transpose=-1)
+song('k545-rondo', 'Sonata K. 545, 3rd movement (Rondo)', 'Sonata K. 545, 3.er movimiento (Rondó)', 'Wolfgang Amadeus Mozart', 'hard', 'k545_3.mid', 'mutopia', mid('k545_3.mid', 'full', [1]), max_tiles=400)
 
 song('cello-prelude', 'Cello Suite No. 1: Prelude, BWV 1007', 'Suite para violonchelo n.º 1: Preludio, BWV 1007', 'Johann Sebastian Bach', 'hard', 'bwv1007_prelude.mid', 'mutopia', mid('bwv1007_prelude.mid', 'full'))
-song('wachet-auf-645', 'Sleepers, Wake! Chorale Prelude, BWV 645', 'Despertad: preludio coral, BWV 645', 'Johann Sebastian Bach', 'hard', 'bwv645.mid', 'mutopia', mid('bwv645.mid', 'full'))
+song('wachet-auf-645', 'Sleepers, Wake! Chorale Prelude, BWV 645', 'Despertad: preludio coral, BWV 645', 'Johann Sebastian Bach', 'hard', 'bwv645.mid', 'mutopia', mid('bwv645.mid', 'full', [1]))
 
 for n in range(1, 16):                      # all fifteen two-part Inventions, BWV 772-786
     f, bwv = 'inv%d.mid' % n, 771 + n
-    song('invention-%d' % n, 'Invention No. %d, BWV %d' % (n, bwv), 'Invención n.º %d, BWV %d' % (n, bwv), 'Johann Sebastian Bach', 'expert', f, 'mutopia', mid(f, 'full'), max_tiles=600)
-song('prelude-cm-847', 'Prelude in C minor, BWV 847', 'Preludio en do menor, BWV 847', 'Johann Sebastian Bach', 'expert', 'bwv847.mid', 'mutopia', mid('bwv847.mid', 'full'), max_tiles=600)
-song('fugue-cm-847', 'Fugue in C minor, BWV 847', 'Fuga en do menor, BWV 847', 'Johann Sebastian Bach', 'expert', 'fugue847.mid', 'mutopia', mid('fugue847.mid', 'full'), max_tiles=600)
-song('italian-concerto', 'Italian Concerto, BWV 971, 1st movement', 'Concierto italiano, BWV 971, 1.er movimiento', 'Johann Sebastian Bach', 'expert', 'bwv971_mvt1.mid', 'mutopia', mid('bwv971_mvt1.mid', 'full'))
-song('toccata-fugue', 'Toccata and Fugue in D minor, BWV 565', 'Tocata y fuga en re menor, BWV 565', 'Traditionally credited to J. S. Bach', 'expert', 'toccata.mid', 'mutopia', mid('toccata.mid', 'full'))
-song('passacaglia', 'Passacaglia in G minor, HWV 432', 'Passacaglia en sol menor, HWV 432', 'George Frideric Handel', 'expert', 'passacaglia.mid', 'cellist', mid('passacaglia.mid', 'full'), max_tiles=520)
-song('k545-allegro', 'Sonata K. 545, 1st movement (complete)', 'Sonata K. 545, 1.er movimiento (completo)', 'Wolfgang Amadeus Mozart', 'expert', 'k545_1.mid', 'mutopia', mid('k545_1.mid', 'full'), max_tiles=2000)
+    song('invention-%d' % n, 'Invention No. %d, BWV %d' % (n, bwv), 'Invención n.º %d, BWV %d' % (n, bwv), 'Johann Sebastian Bach', 'expert', f, 'mutopia', mid(f, 'full', [1]), max_tiles=600)
+song('prelude-cm-847', 'Prelude in C minor, BWV 847', 'Preludio en do menor, BWV 847', 'Johann Sebastian Bach', 'expert', 'bwv847.mid', 'mutopia', mid('bwv847.mid', 'full', [1]), max_tiles=600)
+song('fugue-cm-847', 'Fugue in C minor, BWV 847', 'Fuga en do menor, BWV 847', 'Johann Sebastian Bach', 'expert', 'fugue847.mid', 'mutopia', mid('fugue847.mid', 'full', [1]), max_tiles=600)
+song('italian-concerto', 'Italian Concerto, BWV 971, 1st movement', 'Concierto italiano, BWV 971, 1.er movimiento', 'Johann Sebastian Bach', 'expert', 'bwv971_mvt1.mid', 'mutopia', mid('bwv971_mvt1.mid', 'full', [1]))
+song('toccata-fugue', 'Toccata and Fugue in D minor, BWV 565', 'Tocata y fuga en re menor, BWV 565', 'Traditionally credited to J. S. Bach', 'expert', 'toccata.mid', 'mutopia', mid('toccata.mid', 'full', [1]))
+song('passacaglia', 'Passacaglia in G minor, HWV 432', 'Passacaglia en sol menor, HWV 432', 'George Frideric Handel', 'expert', 'passacaglia.mid', 'cellist', mid('passacaglia.mid', 'full', [1]), max_tiles=520)
+song('k545-allegro', 'Sonata K. 545, 1st movement (complete)', 'Sonata K. 545, 1.er movimiento (completo)', 'Wolfgang Amadeus Mozart', 'expert', 'k545_1.mid', 'mutopia', mid('k545_1.mid', 'full', [1]), max_tiles=2000)
 
 out = []
 for s in S:
@@ -233,8 +281,8 @@ for s in S:
     if ks < -7: ks += 12
     out.append({'id': s['id'], 'title': s['title'], 'titleEs': s['titleEs'], 'composer': s['composer'], 'diff': s['diff'],
                 'bpm': bpm, 'src': s['src'], 'credit': s['credit'], 'ts': meta['ts'], 'ks': max(-7, min(7, ks)), 'bar0': meta['bar0'],
-                'ev': ev})
-    print('%-22s %-9s tiles=%4d bpm=%6.1f first=%s' % (s['id'], s['diff'], len(ev), bpm, [e[2] for e in ev[:10]]))
+                'part': META.get('part', 'piano'), 'ev': ev, 'acc': meta['acc'], 'accInst': meta['accInst']})
+    print('%-22s %-9s tiles=%4d acc=%5d %-8s %s bpm=%6.1f' % (s['id'], s['diff'], len(ev), len(meta['acc']), META.get('part'), meta['accInst'], bpm))
 with open(os.path.join(ROOT, 'js', 'songs.js'), 'w', encoding='utf-8') as f:
     f.write('/* Generated by tools/build_songs.py from music/sources — do not edit by hand. See CREDITS.md. */\n')
     f.write('window.PIANO_SONGS = ' + json.dumps(out, ensure_ascii=False, separators=(',', ':')) + ';\n')
