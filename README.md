@@ -215,6 +215,18 @@ matches its source text exactly. See `data/sources/SOURCE.md`. To rebuild, run
 - **Phone mode** uses letters and space only, hides the on-screen keyboard, and shows simpler
   scenes. A hidden input opens the phone keyboard.
 
+## Version 3.3.1: orchestra or piano, clearer Learn repeat
+
+- **Sound switch** at the top of both song lists (Play and Learn): **Orchestra** (strings, choir,
+  trumpets and the rest) or **Piano** (every part, yours included, on the piano). The choice is
+  saved per player, and the song intro shows what you will hear.
+- **The Learn-mode repeat is easier to see**:
+  - At the end of a song a big box says "🔁 Round 1 complete! Again from the start, 15% faster!".
+  - There are now 4 beats to get ready before the faster round starts.
+  - The bar at the top shows "🔁 Round 2 · +15%" (then +32%, +52%…).
+  - The repeat itself was already working in 3.3.0; if it seemed missing, the browser was probably
+    still showing the older saved version (refresh twice).
+
 ## Version 3.3.0: key rows, play one part, orchestra, Messiah
 
 - **Keys to train (Learn mode)**: the Learn song list has a row picker: **Home row**, **Top row**,

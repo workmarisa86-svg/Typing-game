@@ -186,9 +186,19 @@ const Piano = (() => {
     card.addEventListener('click', onclick);
     return card;
   }
+  // orchestra (strings, choir, trumpets…) or every part on the piano
+  const allPiano = () => (U.profile() && U.profile().settings.pianoSound) === 'piano';
+  function soundPicker(profile) {
+    const cur = allPiano() ? 'piano' : 'orchestra';
+    return U.h('div', { class: 'pm-rows' }, U.h('b', {}, t('soundPick')),
+      ...['orchestra', 'piano'].map(v => U.h('button', { class: 'pm-row' + (v === cur ? ' on' : ''), onclick: () => {
+        profile.settings.pianoSound = v; Store.save(); Sound.play('click'); openMenu();
+      } }, U.h('span', {}, (v === 'piano' ? '🎹 ' : '🎻 ') + t('sound_' + v)), U.h('small', { class: 'hint' }, t('soundHint_' + v)))));
+  }
   function playList(profile, body) {
     const list = songs(), d = modeData(profile, 'play').songs, have = playStars(profile), last = modeData(profile, 'play').last;
     body.append(U.h('div', { class: 'pm-banner' }, U.h('b', {}, '★ ' + have), U.h('span', {}, t('playIntro'))));
+    body.append(soundPicker(profile));
     let nextMarked = false;
     for (let k = 0; k * PER_LEVEL < list.length; k++) {
       const open = have >= levelNeed(k);
@@ -210,6 +220,7 @@ const Piano = (() => {
   function learnList(profile, body) {
     const list = songs(), d = modeData(profile, 'learn').songs, phone = U.isPhone(), last = modeData(profile, 'learn').last;
     body.append(U.h('div', { class: 'pm-banner' }, U.h('span', {}, t('learnIntro'))));
+    body.append(soundPicker(profile));
     // which keyboard row to train: home, top, bottom or numbers
     const cur = keyRow();
     body.append(U.h('div', { class: 'pm-rows' }, U.h('b', {}, t('keyRow')),
@@ -250,7 +261,7 @@ const Piano = (() => {
       U.h('h2', {}, '🎹 ' + title(s)),
       U.h('p', { class: 'center' }, s.composer),
       U.h('p', { class: 'center small' }, diffName(s.diff)),
-      U.h('p', { class: 'center' }, '🎻 ' + t('yourPart', t('inst_' + (s.part || 'piano'))) + ((s.acc || []).length ? ' · ' + t('restPlays', (s.accInst || []).map(n => t('inst_' + n)).join(', ')) : '')),
+      U.h('p', { class: 'center' }, '🎻 ' + t('yourPart', t('inst_' + (allPiano() ? 'piano' : s.part || 'piano'))) + ((s.acc || []).length ? ' · ' + t('restPlays', allPiano() ? t('inst_piano') : (s.accInst || []).map(n => t('inst_' + n)).join(', ')) : '')),
       play ? U.h('p', { class: 'center' }, '👆 ' + t('playHow'))
         : U.h('div', { class: 'intro-keys' }, keys.map(k => U.h('div', { class: 'kcap', style: 'background:#fff' }, k.toUpperCase()))),
       U.h('p', { class: 'center small' }, t('pianoHow')),
@@ -388,11 +399,12 @@ const Piano = (() => {
     Sound.pauseMusic(true);   // no background music while a piece plays
     PianoAudio.setVolume((profile.settings.volume == null ? 80 : profile.settings.volume) / 100);
     // you play one part (s.part); every other part of the piece plays by itself (s.acc)
-    P.part = s.part || 'piano';
+    P.allPiano = allPiano();
+    P.part = P.allPiano ? 'piano' : s.part || 'piano';
     const parts = { [P.part]: new Set() };
     s.ev.forEach(e => e.slice(2).forEach(p => parts[P.part].add(p)));
     const acc = s.acc || [], accInst = s.accInst || [];
-    acc.forEach(a => { const n = accInst[a[3]] || 'piano'; (parts[n] = parts[n] || new Set()).add(a[2]); });
+    acc.forEach(a => { const n = P.allPiano ? 'piano' : accInst[a[3]] || 'piano'; (parts[n] = parts[n] || new Set()).add(a[2]); });
     P.accSeg = s.ev.map((e, k) => {
       const lo = e[0] - 1e-6, hi = k + 1 < s.ev.length ? s.ev[k + 1][0] - 1e-6 : Infinity;
       let a = 0; while (a < acc.length && acc[a][0] < lo) a++;
@@ -506,7 +518,7 @@ const Piano = (() => {
     const b0 = s.ev[i][0], names = s.accInst;
     for (let a = seg[0]; a < seg[1]; a++) {
       const n = s.acc[a];
-      PianoAudio.accNote(n[2], n[1] * spb, names[n[3]] || 'piano', (n[0] - b0) * spb);
+      PianoAudio.accNote(n[2], n[1] * spb, P.allPiano ? 'piano' : names[n[3]] || 'piano', (n[0] - b0) * spb);
     }
   }
   // Play mode: a tile lasts rowLen rows, so the beats until the next tile are stretched to that time
@@ -568,9 +580,10 @@ const Piano = (() => {
       } else {
         // Learn mode: the song starts again straight away, faster, until the lives run out (or you stop)
         P.lap++;
-        P.banner = { text: t('roundClap', P.lap), t: 1.8 };
+        P.banner = { text: '🔁 ' + t('roundClap', P.lap), sub: t('againFaster', Math.round((Math.pow(LAP_SPEEDUP, P.lap) - 1) * 100)), t: 3.2 };
         Sound.play('star');
-        P.beat = Math.max(P.beat, tileBeat(P.next) - 2);
+        P.beat = Math.max(P.beat, tileBeat(P.next) - 4);   // a short breather before the faster round
+        hud();
       }
     }
   }
@@ -765,10 +778,11 @@ const Piano = (() => {
     });
     if (P.banner) {
       cx.globalAlpha = Math.min(1, P.banner.t);
+      if (P.banner.sub) { cx.fillStyle = 'rgba(5,7,13,0.78)'; const bw = Math.min(W - 16 * d, 520 * d); rr(W / 2 - bw / 2, H * 0.35 - 44 * d, bw, 108 * d, 18 * d); cx.fill(); }
       cx.fillStyle = '#8fd3ff'; cx.font = `700 ${Math.round(Math.min(40 * d, W / 11))}px Fredoka, system-ui, sans-serif`;
       cx.fillText(P.banner.text, W / 2, H * 0.35);
       cx.font = `600 ${Math.round(18 * d)}px Fredoka, system-ui, sans-serif`; cx.fillStyle = '#fff';
-      cx.fillText(t('fasterNow'), W / 2, H * 0.35 + 40 * d);
+      cx.fillText(P.banner.sub || t('fasterNow'), W / 2, H * 0.35 + 40 * d);
       cx.globalAlpha = 1;
     }
     if (P.play) drawCelebration(W, H, d);
@@ -854,7 +868,8 @@ const Piano = (() => {
     $('pp-lives').textContent = P.practice ? t('practice') : '♥'.repeat(L - lost) + '♡'.repeat(lost);
     $('pp-progress').style.width = ((P.next % nTiles()) / nTiles() * 100) + '%';
     const st = P.stars || 0;
-    $('pp-laps').textContent = P.play ? '★'.repeat(Math.min(3, st)) + '☆'.repeat(Math.max(0, 3 - st)) + (st > 3 ? ' 👑' + (st - 3) : '') : '';
+    $('pp-laps').textContent = P.play ? '★'.repeat(Math.min(3, st)) + '☆'.repeat(Math.max(0, 3 - st)) + (st > 3 ? ' 👑' + (st - 3) : '')
+      : P.lap > 0 ? '🔁 ' + t('roundN', P.lap + 1) + ' · +' + Math.round((Math.pow(LAP_SPEEDUP, P.lap) - 1) * 100) + '%' : '';
     const nk = tileCol(P.next);
     document.querySelectorAll('#pp-keys .pp-key').forEach(el => el.classList.toggle('next', +el.dataset.c === nk));
   }
